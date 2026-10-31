@@ -309,7 +309,7 @@ npm ci
 cp .env.example .env      # fill the PayPal sandbox credentials
 npm start                 # http://localhost:3000 — an empty database seeds itself
 npm run seed -- --reset   # rebuild the book from scratch
-npm test                  # 144 tests
+npm test                  # 153 tests
 ```
 
 The seed is deterministic: 1,000 synthetic invoices plus the pinned demo set, and 625 of the 1,005 are
@@ -429,7 +429,7 @@ app an HTTPS URL will do; a Cloudflare quick tunnel is enough for sandbox webhoo
 src/        server, router, HTML, gate, price, score, ledger, audit, PayPal client, seed
 rules/      checks.yaml — the eleven checks; jurisdictions.yaml — the per-country numbers they read
 scripts/    sandbox experiments (orders, multi-payee, webhooks, dispute attempt, approvals) and fixtures
-tests/      144 tests: money, gate, price, ledger balance, settlement split, webhook attribution,
+tests/      153 tests: money, gate, price, ledger balance, settlement split, webhook attribution, rail reconciliation,
             reader reconciliation, jurisdiction portability, default & recourse lifecycle,
             assignment notice integrity, sandbox host guard
 evidence/   curated raw sandbox responses (evidence/published/); every measurement in this file can be re-read

@@ -207,11 +207,15 @@ test('a reference typed by someone else does not become a formula in the auditor
     channel: 'Portal', reference: '=HYPERLINK("http://desk.example","click")', enteredBy: 'desk'
   })!;
   recordNoticeService(db, 'inv_1', { channel: '+CMD', reference: '-1,calc', enteredBy: 'desk' })!;
+  // The newline case: a quoted cell whose content starts with a line break, so the formula
+  // character is not the first byte of the cell — spreadsheets read it anyway.
+  recordNoticeService(db, 'inv_1', { channel: '\n=WEBSERVICE("http://desk.example")', reference: 'ok', enteredBy: 'desk' })!;
   const csv = noticeServiceCsv(db);
   assert.ok(
     csv.includes(`"'=HYPERLINK(""http://desk.example"",""click"")"`),
     'the leading operator is neutralised and the inner quotes are doubled'
   );
   assert.ok(csv.includes(`"'+CMD","'-1,calc"`), 'every character a spreadsheet reads as a formula gets the same treatment');
+  assert.ok(csv.includes("'\n=WEBSERVICE(\"http://desk.example\")"), 'a cell that begins with a newline is neutralised too');
   assert.doesNotMatch(csv, /,"=/, 'no cell reaches a spreadsheet as a live formula');
 });

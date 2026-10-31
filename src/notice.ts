@@ -217,7 +217,9 @@ export function noticeServiceCsv(db: DatabaseSync): string {
     'attested_by', 'recorded_at', 'sha256_of_notice_bytes', 'bytes_still_match'];
   const cell = (v: unknown): string => {
     let s = v == null ? '' : String(v);
-    if (/^[-=+@\t\r]/.test(s)) s = `'${s}`;
+    // The newline is in the list with the operators: a quoted cell whose *content* begins with a
+    // line break can still present the character after it to the spreadsheet as a formula start.
+    if (/^[-=+@\t\r\n]/.test(s)) s = `'${s}`;
     return `"${s.replace(/"/g, '""')}"`;
   };
   const lines = [header, ...noticeServiceRegister(db).map((r) => [

@@ -378,7 +378,7 @@ build does not model, and the column is not a switch.
 ## Built during the submission period
 
 Everything here was written for this event: the gate, the scorecard, the pricing, the PayPal client,
-the ledger, the pages, the dataset generator and the tests. 144 tests, all offline, via `npm test` —
+the ledger, the pages, the dataset generator and the tests. 153 tests, all offline, via `npm test` —
 and one of them boots the real server on a local port and goes through the routes rather than the
 functions under them: 401 for a username that is not one of the four, 401 when a side holding its own
 secret is offered the shared one, 403 when a seller POSTs a fund, and the whole-book register CSV
