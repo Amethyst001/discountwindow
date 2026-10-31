@@ -765,6 +765,46 @@ export function renderLedger(rows: any[], totals: any[], sandbox: boolean, event
   return layout({ title: 'Settlement', current: '/ledger', sandbox, canSubmit: mayPress('submit', identity) }, body);
 }
 
+/**
+ * The desk proving itself to whoever asks, with no login: the audit chain re-walked on request,
+ * the book's counts read from the data, the ledger's balance assertion, and what PayPal's webhooks
+ * have actually done. Aggregate only — nothing here names an operator, a party or a document.
+ */
+export function renderStatus(data: any): string {
+  const chain = data.auditChain ?? {};
+  const counts = data.archiveCounts ?? {};
+  const webhooks = (data.webhooksByType ?? []) as any[];
+  const body = join([
+    `<h1>Desk status</h1>`,
+    `<p class="lede">No login, no secrets: the audit chain is re-walked every time this page opens, the counts are read from the data, and the ledger re-asserts its own balance. Aggregate only — this page names no operator, no party and no document.</p>`,
+    `<h2>The audit chain</h2>
+     <table><tbody>
+       <tr><th>Integrity</th><td class="${chain.ok ? 's-verified' : 's-refused'}">${chain.ok ? 'Intact — every hash in the chain recomputes' : `Broken at entry ${chain.brokenAt}: ${esc(chain.reason ?? '')}`}</td></tr>
+       <tr><th>Entries</th><td class="num">${Number(chain.length ?? 0).toLocaleString('en-US')}</td></tr>
+     </tbody></table>`,
+    `<h2>The book</h2>
+     <table><thead><tr><th>Total invoices</th><th>Refused</th><th>Verified</th><th>Funded</th></tr></thead><tbody>
+       <tr><td class="num">${Number(counts.total ?? 0).toLocaleString('en-US')}</td>
+           <td class="num">${Number(counts.refused ?? 0).toLocaleString('en-US')}</td>
+           <td class="num">${Number(counts.verified ?? 0).toLocaleString('en-US')}</td>
+           <td class="num">${Number(counts.funded ?? 0).toLocaleString('en-US')}</td></tr>
+     </tbody></table>`,
+    `<h2>The settlement book</h2>
+     <table><thead><tr><th>Account</th><th>Kind</th><th class="r">Balance</th></tr></thead><tbody>
+     ${(data.ledgerTotals ?? []).map((t: any) => `<tr><td class="mono">${esc(t.account)}</td><td class="muted">${esc(t.kind)}</td><td class="r num">${formatCents(Number(t.balance))}</td></tr>`).join('')}
+     </tbody></table>`,
+    `<h2>Webhooks PayPal delivered</h2>
+     ${webhooks.length === 0
+       ? `<p class="note">None yet.</p>`
+       : `<table><thead><tr><th>Event</th><th class="r">Delivered</th><th class="r">Signature verified</th></tr></thead><tbody>
+         ${webhooks.map((w) => `<tr><td class="mono small">${esc(w.type)}</td><td class="r num">${Number(w.n)}</td><td class="r num">${Number(w.verified ?? 0)}</td></tr>`).join('')}
+         </tbody></table>
+         <p class="note">Last delivery: ${esc(String(data.lastWebhookAt ?? '—').replace('T', ' ').slice(0, 19))}. Only a signed event can change a position; an unverified one is kept as evidence and ignored.</p>`}`,
+    `<p class="note" style="margin-top:24px">The same data as JSON: <a class="mono" href="/api/status">/api/status</a>. The desk's full machine surface — the book, each deal room, the ledger — starts at <a class="mono" href="/api/invoices">/api/invoices</a>, signed in as the desk.</p>`
+  ]);
+  return layout({ title: 'Status', current: '/status', sandbox: !!data.sandbox, canSubmit: false }, body);
+}
+
 export function renderSubmit(dealers: { id: string; legal_name: string; limit_cents: number }[], sandbox: boolean, error?: string, identity?: Identity | null): string {
   const today = todayIso();
   const body = join([

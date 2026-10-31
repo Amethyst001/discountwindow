@@ -23,7 +23,7 @@ code path was deleted — see *Why PayPal*.
 
 A freight-invoice financier loses money on three things: goods that were never delivered, delivery
 to someone who is not the debtor, and the same paperwork funded twice. All three are visible in the
-document set before a penny is advanced — if someone opens the documents and compares them against
+document set before a dollar is advanced — if someone opens the documents and compares them against
 the debtor record. At volume nobody does.
 
 So the desk does it, and makes the refusal the product. On the seeded book, **625 of 1,005 invoices

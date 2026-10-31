@@ -15,7 +15,7 @@ export type Role = (typeof ROLES)[number];
  * allowed to close its own loss, would be a book that reports whatever its counterparties want.
  */
 const MAY: Record<Role, string[]> = {
-  desk: ['submit', 'fund', 'capture', 'settle', 'default', 'repurchase', 'write off', 'serve notice', 'export the register'],
+  desk: ['submit', 'fund', 'capture', 'settle', 'default', 'repurchase', 'write off', 'serve notice', 'export the register', 'read the api'],
   seller: ['submit'],
   funder: ['fund', 'capture'],
   debtor: ['settle']

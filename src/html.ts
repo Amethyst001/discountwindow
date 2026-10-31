@@ -134,7 +134,8 @@ export function layout(opts: LayoutOptions, body: string): string {
     ['/', 'The Book'],
     ['/submit', 'Submit'],
     ['/archive', 'Refusals'],
-    ['/ledger', 'Settlement']
+    ['/ledger', 'Settlement'],
+    ['/status', 'Status']
   ] as const).filter(([href]) => href !== '/submit' || opts.canSubmit !== false);
   return `<!doctype html>
 <html lang="en">

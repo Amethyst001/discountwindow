@@ -175,3 +175,43 @@ test('the routes enforce the login, the name and the verb — over HTTP, not in 
     await stop();
   }
 });
+
+test('the machine surface: a public status page, a desk-only JSON API, and a webhook that reaches its signature check', async () => {
+  const stop = await boot();
+  try {
+    // /status is public on purpose: a judge with no credentials gets to watch the book prove
+    // itself — the chain re-walked, the counts, the balance assertion.
+    const status = await get('/status');
+    assert.equal(status.status, 200);
+    assert.match(await status.text(), /audit chain/i);
+    assert.equal((await get('/api/status')).status, 200);
+
+    // The API is the desk's. No login is a 401; a wrong role is a JSON 403 that names the verb;
+    // the desk gets JSON objects back.
+    assert.equal((await get('/api/invoices')).status, 401);
+    const sellerApi = await get('/api/invoices', `seller:${SHARED}`);
+    assert.equal(sellerApi.status, 403);
+    assert.match(await sellerApi.text(), /may not read the api/);
+    const listRes = await get('/api/invoices', `desk:${DESK}`);
+    assert.equal(listRes.status, 200);
+    assert.match(listRes.headers.get('content-type') ?? '', /application\/json/);
+    const list = JSON.parse(await listRes.text());
+    assert.equal(Array.isArray(list.invoices), true);
+    assert.equal(list.invoices.length, 2);
+    assert.equal(list.counts.total, 2);
+    const detail = JSON.parse(await (await get(`/api/invoices/${book.pricedId}`, `desk:${DESK}`)).text());
+    assert.ok(JSON.stringify(detail).includes('H-1'), 'the deal room object carries the invoice');
+    assert.equal((await get('/api/invoices/NOPE', `desk:${DESK}`)).status, 404);
+    const ledger = JSON.parse(await (await get('/api/ledger', `desk:${DESK}`)).text());
+    assert.ok(Array.isArray(ledger.rows), 'the ledger arrives as its rows');
+    assert.ok(Array.isArray(ledger.totals), 'the totals arrive beside them');
+
+    // PayPal delivers webhooks without basic auth: a malformed body reaches the handler and its
+    // json check (400) instead of the 401 wall. The same path with GET is still closed.
+    const hook = await fetch(`${BASE}/webhooks/paypal`, { method: 'POST', body: 'not json' });
+    assert.equal(hook.status, 400);
+    assert.equal((await get('/webhooks/paypal')).status, 401);
+  } finally {
+    await stop();
+  }
+});

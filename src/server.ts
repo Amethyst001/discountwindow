@@ -7,7 +7,7 @@ import { basicAuthIdentity, roleAllows, type Identity } from './auth.ts';
 import { openDb, newId, nowIso } from './db.ts';
 import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, resolveWebhookInvoice, freezeForDispute, releaseFreeze, markCaptureCompleted, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim } from './store.ts';
 import { storedNotice, recordNoticeService, noticeServiceCsv } from './notice.ts';
-import { renderBook, renderDealRoom, renderLedger, renderArchive, renderSubmit, viewOf } from './pages.ts';
+import { renderBook, renderDealRoom, renderLedger, renderArchive, renderSubmit, renderStatus, viewOf } from './pages.ts';
 import { verifyChain, appendAudit } from './audit.ts';
 import { verifyWebhookSignature, getOrder } from './paypal.ts';
 import { extractEvidence } from './extract.ts';
@@ -97,6 +97,19 @@ function noticePage(title: string, message: string, back: string): string {
     <h1 style="font-family:Georgia,serif;font-weight:500">${esc(title)}</h1><p>${esc(message)}</p><p><a href="${esc(back)}">Back to the invoice</a></p>`;
 }
 
+/** Everything the status page and /api/status show, computed on request, aggregate only. */
+function statusData(db: ReturnType<typeof openDb>) {
+  return {
+    sandbox: isSandbox(),
+    generatedAt: nowIso(),
+    auditChain: verifyChain(db),
+    archiveCounts: archiveCounts(db),
+    ledgerTotals: ledgerTotals(db),
+    webhooksByType: db.prepare('SELECT type, COUNT(*) AS n, SUM(verified) AS verified FROM webhook_events GROUP BY type ORDER BY n DESC').all(),
+    lastWebhookAt: (db.prepare('SELECT MAX(received_at) AS at FROM webhook_events').get() as any)?.at ?? null
+  };
+}
+
 async function orderIsApproved(orderId: string): Promise<{ ok: boolean; status: string }> {
   const order = await getOrder(orderId).catch(() => null);
   const status = String(order?.status ?? 'UNKNOWN');
@@ -141,10 +154,16 @@ const server = http.createServer(async (req, res) => {
   const path = url.pathname.replace(/\/+$/, '') || '/';
   try {
     // A public demo URL can create sandbox orders and captures, so it carries one shared password
-    // and four named identities; the username decides what the session may do. /health stays open
-    // for the container health check.
+    // and four named identities; the username decides what the session may do. Three doors stay
+    // open without it: /health for the container check, the status page — which exists to be read
+    // by somebody with no credentials at all — and PayPal's webhook POSTs. Those carry no basic
+    // auth and need none: the handler refuses to act on anything whose signature does not verify,
+    // so the route's authority is the signature, not the password. A GET on the webhook path is
+    // still behind the wall.
+    const webhookDelivery = req.method === 'POST' && path === '/webhooks/paypal';
+    const openPath = path === '/health' || path === '/status' || path === '/api/status' || webhookDelivery;
     const auth = basicAuthIdentity(req.headers.authorization, config.demoPassword, config.demoPasswordsByRole);
-    if (!auth.ok && path !== '/health') {
+    if (!auth.ok && !openPath) {
       res.writeHead(401, {
         'WWW-Authenticate': 'Basic realm="The Discount Window (desk | seller | funder | debtor)", charset="UTF-8"',
         'Content-Type': 'text/plain'
@@ -255,6 +274,39 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/ledger') {
       const events = db.prepare('SELECT received_at, type, verified, outcome FROM webhook_events ORDER BY received_at DESC LIMIT 20').all();
       return send(res, 200, renderLedger(ledgerRows(db), ledgerTotals(db), isSandbox(), events as any[], identity));
+    }
+    // The status page: the desk's vitals for whoever asks, no login. Aggregate only — it names no
+    // operator, no party and no document, which is what makes it safe to leave open.
+    if (req.method === 'GET' && (path === '/status' || path === '/api/status')) {
+      const data = statusData(db);
+      if (path === '/api/status') return send(res, 200, JSON.stringify(data, null, 2), 'application/json');
+      return send(res, 200, renderStatus(data));
+    }
+    // The machine surface: the same objects the desk's pages render, as JSON. Desk-only, because
+    // these objects carry the desk's notebook — the service register, the raw extractions — and
+    // the lens that hides those on the page is a render decision, not a data one. An agent reading
+    // this surface signs in as the desk, exactly as a human operator does; a 403 here is JSON,
+    // because the client is a program.
+    if (req.method === 'GET' && path === '/api/invoices') {
+      if (deny('read the api')) return;
+      return send(res, 200, JSON.stringify({
+        sandbox: isSandbox(),
+        generatedAt: nowIso(),
+        counts: archiveCounts(db),
+        invoices: listInvoices(db, { status: url.searchParams.get('status') ?? undefined })
+      }, null, 2), 'application/json');
+    }
+    const apiDetailMatch = /^\/api\/invoices\/([A-Za-z0-9_]+)$/.exec(path);
+    if (req.method === 'GET' && apiDetailMatch) {
+      if (deny('read the api')) return;
+      const detail = invoiceDetail(db, apiDetailMatch[1]);
+      if (!detail) return send(res, 404, JSON.stringify({ error: 'not found' }), 'application/json');
+      return send(res, 200, JSON.stringify(detail, null, 2), 'application/json');
+    }
+    if (req.method === 'GET' && path === '/api/ledger') {
+      if (deny('read the api')) return;
+      const events = db.prepare('SELECT received_at, type, verified, outcome FROM webhook_events ORDER BY received_at DESC LIMIT 20').all();
+      return send(res, 200, JSON.stringify({ rows: ledgerRows(db), totals: ledgerTotals(db), recentWebhooks: events }, null, 2), 'application/json');
     }
     const detailMatch = /^\/invoices\/([A-Za-z0-9_]+)$/.exec(path);
     if (req.method === 'GET' && detailMatch) {

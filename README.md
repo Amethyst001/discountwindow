@@ -16,13 +16,15 @@ sample and by tests, and is labelled as such wherever it appears.
 
 An invoice financier loses money on three things: goods that were never delivered, delivery to
 someone who is not the debtor, and the same paperwork funded twice. All three are visible in the
-document set before a pound is advanced — if someone actually opens the documents and compares them
+document set before a dollar is advanced — if someone actually opens the documents and compares them
 against the debtor record. At volume nobody does.
 
 This desk does that comparison as a gate. Refusals are the product: 625 of the 1,005 invoices the seed
 produces today are refused, each with a machine-readable reason (`POD_MISSING`,
 `CONSIGNEE_MISMATCH`, `DELIVERY_DATE_OUT_OF_WINDOW`, `EVIDENCE_REUSED`, …) that the seller can act
-on. The archive counts are read from the data by the app, never hard-coded in the page.
+on. The counts name what the seeded book actually tripped; `EVIDENCE_REUSED` — the same document
+offered twice, caught by its hash — is a live check the seed never happens to fire. The archive
+counts are read from the data by the app, never hard-coded in the page.
 
 ## The two money beats
 
