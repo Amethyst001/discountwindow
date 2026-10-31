@@ -216,6 +216,6 @@ test('a reference typed by someone else does not become a formula in the auditor
     'the leading operator is neutralised and the inner quotes are doubled'
   );
   assert.ok(csv.includes(`"'+CMD","'-1,calc"`), 'every character a spreadsheet reads as a formula gets the same treatment');
-  assert.ok(csv.includes("'\n=WEBSERVICE(\"http://desk.example\")"), 'a cell that begins with a newline is neutralised too');
+  assert.ok(csv.includes("'\n=WEBSERVICE(\"\"http://desk.example\"\")"), 'a cell that begins with a newline is neutralised too');
   assert.doesNotMatch(csv, /,"=/, 'no cell reaches a spreadsheet as a live formula');
 });
