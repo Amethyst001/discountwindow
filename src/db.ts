@@ -322,6 +322,8 @@ export function openDb(dbPath = config.dbPath): DatabaseSync {
   if (!priceColumns.has('recourse')) db.exec("ALTER TABLE prices ADD COLUMN recourse TEXT NOT NULL DEFAULT 'recourse'");
   const evidenceColumns = new Set((db.prepare('PRAGMA table_info(evidence_files)').all() as any[]).map((c) => c.name));
   if (!evidenceColumns.has('tracker')) db.exec('ALTER TABLE evidence_files ADD COLUMN tracker TEXT');
+  const debtorColumns = new Set((db.prepare('PRAGMA table_info(debtors)').all() as any[]).map((c) => c.name));
+  if (!debtorColumns.has('rail_ref')) db.exec('ALTER TABLE debtors ADD COLUMN rail_ref TEXT');
   // The index is made here rather than in SCHEMA: SCHEMA runs before the ALTER above, so an index on
   // a column a pre-existing database does not have yet would stop an upgraded book from opening at all.
   db.exec('CREATE INDEX IF NOT EXISTS evidence_tracker ON evidence_files (tracker)');

@@ -186,3 +186,35 @@ export async function verifyWebhookSignature(headers: Record<string, string | un
   });
   return { ok: res.body?.verification_status === 'SUCCESS', status: res.status, body: res.body };
 }
+
+/**
+ * This account's own transaction history — which is where a debtor's repayments live. The search
+ * returns what this account saw; filtered by the counterparty's email it becomes the debtor's
+ * payment record, read from the rail rather than declared by the paper.
+ *
+ * Measured against the sandbox (31 Oct 2026): the dates must carry a numeric UTC offset — `Z` is
+ * refused as "Invalid date passed", and a `+` offset dies in the query string, where `+` decodes to
+ * a space — so the wire format is `yyyy-MM-ddTHH:mm:ss-0000`. The window is capped at 31 days per
+ * call, so a longer range is sliced and the pages concatenated.
+ */
+export async function searchTransactions(opts: { startDate: string; endDate: string; pageSize?: number }): Promise<any> {
+  const wire = (iso: string) => iso.replace(/\.\d{3}Z$/, '-0000');
+  const sliceMs = 30 * 86_400_000;
+  const startMs = Date.parse(opts.startDate);
+  const endMs = Date.parse(opts.endDate);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) throw new Error('transaction search: bad dates');
+  const details: any[] = [];
+  for (let from = startMs; from < endMs; from += sliceMs) {
+    const to = Math.min(from + sliceMs, endMs);
+    const q = new URLSearchParams({
+      start_date: wire(new Date(from).toISOString()),
+      end_date: wire(new Date(to).toISOString()),
+      fields: 'transaction_info,payer_info',
+      page_size: String(opts.pageSize ?? 100)
+    });
+    const res = await call('GET', `/v1/reporting/transactions?${q}`);
+    if (res.status !== 200) throw new Error(`transaction search failed: ${res.status} ${res.text.slice(0, 200)}`);
+    details.push(...(res.body?.transaction_details ?? []));
+  }
+  return { transaction_details: details };
+}

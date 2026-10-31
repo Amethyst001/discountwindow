@@ -47,6 +47,10 @@ export const config = {
   } as Record<string, string>,
   dbPath: read('DB_PATH', path.join(ROOT, 'data', 'discountwindow.sqlite')),
   evidenceDir: read('EVIDENCE_DIR', path.join(ROOT, 'data', 'evidence')),
+  // '1' turns on rail-sourced debtor history at intake: the scorecard is reconciled against the
+  // account's own PayPal transactions instead of the declared record. Off by default — the sandbox
+  // demo book must score the same way twice — and said out loud wherever the scorecard is shown.
+  railHistory: read('RAIL_HISTORY'),
   // Optional second-pass reader for documents the deterministic parser cannot line up. Any
   // OpenAI-compatible chat endpoint works; with no key the app never leaves the deterministic path.
   geminiKey: read('EXTRACT_API_KEY'),

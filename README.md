@@ -26,7 +26,14 @@ cross-border payments into a linked Paga wallet. The gate underneath is not regi
 eleven checks read a US freight proof of delivery and a GB wholesaler's paperwork, because a
 jurisdiction is a block of YAML, not a change to the money code.
 
-This desk does that comparison as a gate. Refusals are the product: 625 of the 1,005 invoices the seed
+This desk does that comparison as a gate. Refusals are the product — and not a dead end: every
+refusal carries the sentence that says what the seller can do about it, and a corrected document
+comes back as a resubmission that names the refusal it answers. The scorecard behind the price reads
+this desk's own record with the debtor, never a bureau — and with `RAIL_HISTORY=1` it is reconciled
+against the account's own PayPal transaction history, so "days late" is the rail's timestamp for
+when money actually landed; the choice is written to the audit chain either way.
+
+The refusal counts below are the gate at work: 625 of the 1,005 invoices the seed
 produces today are refused, each with a machine-readable reason (`POD_MISSING`,
 `CONSIGNEE_MISMATCH`, `DELIVERY_DATE_OUT_OF_WINDOW`, `EVIDENCE_REUSED`, …) that the seller can act
 on. The counts name what the seeded book actually tripped; `EVIDENCE_REUSED` — the same document

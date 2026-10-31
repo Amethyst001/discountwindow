@@ -94,6 +94,10 @@ console.log('A-1042', a.status, a.gate.verdict, 'score', a.score.score, a.score.
 ensureParty(db, 'funders', { id: 'funder-firstlight', name: 'Firstlight Credit Partners', paypalEmail: config.funderEmail || 'funder@example.com' });
 db.prepare(`INSERT OR REPLACE INTO debtor_history (debtor_id, invoices_due, paid_on_time, days_late_average, months_active, disputes)
             VALUES (?,?,?,?,?,?)`).run(DEMO_DEBTOR.id, 24, 16, 4.2, 18, 0);
+// The debtor's rail reference — the email its repayments arrive from — so RAIL_HISTORY=1 can
+// reconcile this book against the account's own PayPal transaction history instead of this row.
+db.prepare('UPDATE debtors SET rail_ref = COALESCE(rail_ref, ?) WHERE id = ?')
+  .run(config.debtorEmail || 'debtor@personal.example.com', DEMO_DEBTOR.id);
 
 // ---- 1b. The same seller, a smaller receivable. This is the one the demo funds against the live
 // sandbox. Sandbox payee accounts created through Adaptive Accounts are unverified and refuse

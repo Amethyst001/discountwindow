@@ -58,6 +58,11 @@ counts are read from the data by the app; they are not copy.
    billing country selects. Nothing is priced until they pass.
 4. **Score and price.** A six-part scorecard on the debtor — on-time rate, days late, exposure,
    relationship, disputes, size — sets the band; the band sets the rate, the LTV and the tenor cap.
+   The record behind the scorecard comes from this desk's own history with the debtor, never from a
+   bureau — and with `RAIL_HISTORY=1` it is reconciled against the account's own PayPal transaction
+   history (`GET /v1/reporting/transactions`), so "days late" is the rail's timestamp for when money
+   actually landed, not the paper's claim. The choice is written to the hash-chained audit chain
+   either way; a rail that will not answer falls back to the declared record — recorded, not glossed.
 5. **Fund.** The funder approves one PayPal order whose two purchase units divide the advance — the
    seller's net and the platform's origination fee. One capture pays both, to two different accounts.
    When that capture is recorded and the paper is owned outright, the desk issues the **notice of

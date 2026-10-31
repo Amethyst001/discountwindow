@@ -9,7 +9,10 @@ import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows,
 import { storedNotice, recordNoticeService, noticeServiceCsv } from './notice.ts';
 import { renderBook, renderDealRoom, renderLedger, renderArchive, renderSubmit, renderStatus, viewOf } from './pages.ts';
 import { verifyChain, appendAudit } from './audit.ts';
-import { verifyWebhookSignature, getOrder } from './paypal.ts';
+import { verifyWebhookSignature, getOrder, searchTransactions } from './paypal.ts';
+import { normalizeTransactions, reconcileRailHistory } from './rail.ts';
+import type { Cents } from './money.ts';
+import type { DebtorHistory } from './score.ts';
 import { extractEvidence } from './extract.ts';
 import { parseMoneyToCents } from './money.ts';
 import { esc } from './html.ts';
@@ -108,6 +111,36 @@ function statusData(db: ReturnType<typeof openDb>) {
     webhooksByType: db.prepare('SELECT type, COUNT(*) AS n, SUM(verified) AS verified FROM webhook_events GROUP BY type ORDER BY n DESC').all(),
     lastWebhookAt: (db.prepare('SELECT MAX(received_at) AS at FROM webhook_events').get() as any)?.at ?? null
   };
+}
+
+/**
+ * The debtor's record for a new intake. With RAIL_HISTORY=1 and a rail reference on the debtor,
+ * the scorecard is reconciled against this account's own PayPal transactions — the rail's
+ * timestamps for when money actually landed, not the paper's claim — and the choice is written to
+ * the audit chain either way. A rail that will not answer is not allowed to become a worse guess:
+ * the desk falls back to the declared record and records why.
+ */
+async function intakeHistory(db: ReturnType<typeof openDb>, debtorId: string, faceCents: Cents): Promise<DebtorHistory> {
+  const declared = debtorHistory(db, debtorId, faceCents);
+  if (config.railHistory !== '1') return declared;
+  const ref = (db.prepare('SELECT rail_ref FROM debtors WHERE id = ?').get(debtorId) as any)?.rail_ref;
+  if (!ref) return declared;
+  try {
+    const end = new Date();
+    const start = new Date(Date.now() - 180 * 86_400_000);
+    const body = await searchTransactions({ startDate: start.toISOString(), endDate: end.toISOString() });
+    const settled = (db.prepare(`
+      SELECT due_on, face_cents FROM invoices WHERE debtor_id = ? AND status IN ('settled','matured')`).all(debtorId) as any[])
+      .map((r) => ({ dueOn: r.due_on, amountCents: Number(r.face_cents) }));
+    const reconciled = reconcileRailHistory({
+      declared, invoices: settled, transactions: normalizeTransactions(body), debtorRef: ref
+    });
+    appendAudit(db, 'rail-history', debtorId, { source: reconciled.source, matched: reconciled.matched, windowDays: 180 });
+    return reconciled.history;
+  } catch (err: any) {
+    appendAudit(db, 'rail-history', debtorId, { source: 'declared', reason: String(err?.message ?? err).slice(0, 200) });
+    return declared;
+  }
 }
 
 async function orderIsApproved(orderId: string): Promise<{ ok: boolean; status: string }> {
@@ -253,7 +286,7 @@ const server = http.createServer(async (req, res) => {
         // override rather than a pass.
         protection: { status: field('railStatus') === 'NOT_ON_RAIL' ? 'NOT_ON_RAIL' : 'UNKNOWN' },
         recourse: field('recourse') === 'non_recourse' ? 'non_recourse' : 'recourse',
-        history: debtorHistory(db, debtor.id, face),
+        history: await intakeHistory(db, debtor.id, face),
         sandbox: isSandbox(),
         allowProtectionOverride: ALLOW_OVERRIDE
       });
@@ -421,7 +454,7 @@ const server = http.createServer(async (req, res) => {
         },
         protection: { status: 'UNKNOWN' },
         recourse: 'recourse',
-        history: debtorHistory(db, debtor.id, Number(refused.invoice.face_cents)),
+        history: await intakeHistory(db, debtor.id, Number(refused.invoice.face_cents) as Cents),
         sandbox: isSandbox(),
         allowProtectionOverride: ALLOW_OVERRIDE
       });

@@ -1,0 +1,38 @@
+{
+  "probe": "x12-rail-history",
+  "fetchedAt": "2026-10-31T13:33:50.135Z",
+  "debtor": {
+    "id": "debtor-halcyon",
+    "name": "Halcyon Retail Group",
+    "railRef": "debtor@personal.example.com"
+  },
+  "windowDays": 180,
+  "settledInvoicesOnBook": 1,
+  "paypalEndpoint": "GET /v1/reporting/transactions",
+  "railTransactionsInWindow": 1,
+  "source": "declared",
+  "matched": 0,
+  "declaredRecord": {
+    "invoicesDue": 24,
+    "paidOnTime": 16,
+    "daysLateAverage": 4.2,
+    "outstandingCents": 130000,
+    "limitCents": 30000000,
+    "monthsActive": 18,
+    "disputes": 0,
+    "totalInvoices": 31,
+    "faceCents": 65000
+  },
+  "reconciledRecord": {
+    "invoicesDue": 24,
+    "paidOnTime": 16,
+    "daysLateAverage": 4.2,
+    "outstandingCents": 130000,
+    "limitCents": 30000000,
+    "monthsActive": 18,
+    "disputes": 0,
+    "totalInvoices": 31,
+    "faceCents": 65000
+  },
+  "note": "No settled invoice matched a rail transaction in the window, so the declared record stands. In the sandbox the demo debtor has no settled repayments of its own yet — the reconciliation path is exercised by tests/rail.test.ts and the RAIL_HISTORY=1 intake switch."
+}
