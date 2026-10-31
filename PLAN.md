@@ -1711,3 +1711,28 @@ copy line, not by adding client JS); its Impact note repeats the Commerce Platfo
 bound. Both runs restated items that remain human-blocked (video, hosted URL, US card-funded
 merchant) or previously declined with reasons (Commerce Platform onboarding document — a page of
 plausible steps would be the one unverified page in the packet; the reason from round 10 stands).
+
+### 32.2 Iterations 2 and 3 — the wave is stable at 93–96 (2026-10-31, ~14:00–14:45 UTC)
+
+| Iteration | nemotron | gemini | Notes |
+|---|---|---|---|
+| 1 (full / short) | **96** | **94** | findings closed in §32.1 |
+| 2 (full / short) | **96** | **94** | gemini moved Design 18→19, citing the refusal remediation and the wait-note |
+| 3 (short / short) | **94** | **93** | cross-paired packets; the nemotron 96→94 swing is the same-model variance the round-10 rule already states |
+
+Mean across six runs: nemotron 95.3, gemini 93.7. Both reviewers put Stage One as an explicit pass.
+Withheld points, every time: the video and the hosted URL (human deliverables), the US card-funded
+merchant (account-blocked, recorded since round 8), and the Commerce Platform onboarding bound
+(stated, not hidden). New observations this round and their dispositions:
+
+- *Unharmonized test count (144 vs 153) across files* (gemini, it.2): the current claims in
+  README and DEVPOST both say 153. The 144s gemini saw are PLAN.md's historical journal entries —
+  rounds 8–10 record what the suite was at the time, and a journal that erases its own past to
+  please a reviewer is not a journal. Rebutted with this note.
+- *Free-tier 429 cadence surfaced as a user-visible note rather than a queued retry* (nemotron,
+  it.3): true and deliberate — a retry queue behind a free-tier reader would turn one slow verdict
+  into an unbounded wait with no authority to spend. The note says what happened. Rebutted.
+- *Commerce Platform onboarding document* (both, repeated): declined again, reason unchanged from
+  round 10 — a page of plausible steps would be the one unverified page in the packet.
+- *Three-reader evidence card* (nemotron, it.3): the phrase means the parser beside the two
+  readers — the packet calls this out; no change.
