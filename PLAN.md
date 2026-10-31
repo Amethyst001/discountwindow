@@ -1665,3 +1665,49 @@ API stub for E02: refused deliberately, because a stub would make the gate claim
 perform, which is the one thing this build does not do. A PNG of the three-way payer ledger next to
 `x2-three-payee.json`: cheap and legitimate, deferred to the video pass because the same screen is
 the maturity beat in `VIDEO.md`.
+
+## 32. Round 11 — the improvement wave (2026-10-31)
+
+Four commits of build, then the round-11 panels. What changed between round 10 and this round:
+
+- **The machine surface** (`daf60e1`): `/status` (public, aggregate, chain re-walked on open),
+  `/api/invoices`, `/api/invoices/{id}`, `/api/ledger` (desk-only, JSON 403s) — an agent can now
+  read the book instead of screen-scraping it. PayPal webhook POSTs no longer require the shared
+  password; their authority is the signature check, proven over HTTP by a forged-event test (stored,
+  never acted on) and a replay test (answered `duplicate`, no second row).
+- **Fix-my-refusal** (`ef6cf77`): every check in `rules/checks.yaml` carries a `seller_action`; the
+  refusal card lists every reason with its fix sentence; a corrected document returns as a NEW
+  receivable naming the refusal (refusals stay terminal; revisions from the whole correction chain;
+  E06 still guards reuse). Measured fixture lesson: a resubmission scored against an empty declared
+  record lands in band D — the desk refuses paper from a debtor with no record, which is correct.
+- **The debtor record from the rail** (`0158406`): `RAIL_HISTORY=1` reconciles settled invoices
+  against `GET /v1/reporting/transactions`. Measured against the sandbox: `Z` dates are refused as
+  "Invalid date passed", a `+` offset dies as a space in the query string, the wire format is
+  `-0000`, and the 31-day window cap is sliced. `x12-rail-history.json` is the honest artefact: one
+  rail row in the window, zero matched, source declared — recorded, not glossed.
+- **The audience**: the problem is now a maker in Aba selling to Texas on net-60 (Paga receiving,
+  January 2026), widening in one sentence to the jurisdiction-as-YAML mechanism (`1dfc210`). The
+  opener no longer claims the $4,200 invoice was funded.
+- **Machine-surface documentation** (`cbeb9d9`): `docs/openapi.yaml` and a Postman collection,
+  written against the routes as they answer.
+- Round-11 iteration 1 closures (`4a41913`, `0c8f89c`): the CSV register neutralises a leading
+  newline (nemotron's one real code finding — a quoted cell could still start a formula after a
+  line break); doc counts updated from a stale 144 to the true 153; the submit page now says the
+  readers take up to a minute and that the page does not spin while they work (gemini's Design
+  finding, answered without breaking the zero-JS stance).
+
+### 32.1 Iteration 1 — nemotron 96, gemini 94 (2026-10-31, ~13:50 UTC)
+
+| Reviewer | Total | TI | Design | Impact | Innovation | Presentation |
+|---|---|---|---|---|---|---|
+| nemotron | **96** | 20 | 20 | 19 | 20 | 17 |
+| gemini | **94** | 19 | 18 | 18 | 20 | 19 |
+
+Nemotron withheld its three Presentation points for the video and hosted URL only, called
+Innovation at 20 with the two-reader ratchet, E06's double key and the register's formula
+neutralisation named, and its one code finding — the CSV newline — is closed above. Gemini's
+weakest axis moved from Impact to Design (extraction has no progress feedback — answered by the
+copy line, not by adding client JS); its Impact note repeats the Commerce Platform onboarding
+bound. Both runs restated items that remain human-blocked (video, hosted URL, US card-funded
+merchant) or previously declined with reasons (Commerce Platform onboarding document — a page of
+plausible steps would be the one unverified page in the packet; the reason from round 10 stands).

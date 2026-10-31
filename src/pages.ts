@@ -833,6 +833,7 @@ export function renderSubmit(dealers: { id: string; legal_name: string; limit_ce
   const body = join([
     `<h1>Submit a receivable</h1>`,
     `<p class="lede">The seller uploads the invoice details and the delivery evidence. An extraction agent reads the proof of delivery, and eleven checks decide whether the invoice can be listed. Nothing here is a formality: most submissions are refused.</p>`,
+    `<p class="note" style="margin-bottom:18px">Reading the document is the slow step — two independent readers take up to a minute, and this page is server-rendered on purpose, so it does not spin or tick while they work. It moves when the verdict does.</p>`,
     error ? `<div class="refusal" style="margin-bottom:24px"><p style="margin:0">${esc(error)}</p></div>` : '',
     `<form method="post" action="/submit" enctype="multipart/form-data" class="card" style="max-width:760px">`,
     `<div class="grid cols-2" style="gap:18px 24px">`,
