@@ -1,0 +1,254 @@
+# The Discount Window — machine surface.
+#
+# This file describes what actually exists: the read-only JSON surface the desk serves, the public
+# status endpoint, the container health check and the webhook door. It is hand-written against
+# src/server.ts and kept deliberately honest — every path here answers on a running server; every
+# path NOT here is HTML for a human, not an API.
+#
+# Authority model: the JSON surface belongs to the desk (basic auth, username `desk`). PayPal
+# webhook deliveries carry no basic auth; their authority is the signature check inside the handler,
+# which stores unverified events and acts on none of them.
+openapi: 3.1.0
+info:
+  title: The Discount Window
+  version: 1.0.0
+  description: |
+    A receivables desk that advances cash against a supplier's invoice and settles the advance
+    over PayPal. Eleven deterministic evidence checks (E00-E10) gate every advance; the AI reads
+    documents and never touches the money path. This surface is read-only: an agent can read every
+    object the desk's pages render, and cannot move a cent.
+servers:
+  - url: http://localhost:3000
+    description: Local development (no password configured; the session is the desk)
+components:
+  securitySchemes:
+    basicDemo:
+      type: http
+      scheme: basic
+      description: 'Username is the role: desk | seller | funder | debtor. With DEMO_PASSWORD set, the shared password admits all four; a per-side secret (DEMO_PASSWORD_DESK) replaces it for that role.'
+security:
+  - basicDemo: []
+paths:
+  /health:
+    get:
+      summary: Container health check
+      description: Open without authentication, because a container has no password to give.
+      security: []
+      responses:
+        '200':
+          description: The audit chain, re-walked on every call.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    description: true when every hash in the audit chain recomputes.
+                  audit:
+                    type: object
+                    properties:
+                      ok: { type: boolean }
+                      length: { type: integer }
+                      brokenAt: { type: [integer, 'null'] }
+                      reason: { type: [string, 'null'] }
+                  sandbox:
+                    type: boolean
+  /status:
+    get:
+      summary: The desk proving itself, with no login
+      description: Aggregate only — the audit chain re-walked, the book's counts, the ledger's balance assertion, and what PayPal's webhooks have done. Names no operator, no party, no document.
+      security: []
+      responses:
+        '200':
+          description: The status page (HTML).
+          content:
+            text/html:
+              schema: { type: string }
+  /api/status:
+    get:
+      summary: The same data as JSON
+      security: []
+      responses:
+        '200':
+          description: Aggregate vitals, as JSON.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusData' }
+  /api/invoices:
+    get:
+      summary: The book, as the desk sees it
+      responses:
+        '200':
+          description: Every invoice with its current score, band, price and status, plus the archive counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sandbox: { type: boolean }
+                  generatedAt: { type: string, format: date-time }
+                  counts:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      refused: { type: integer }
+                      verified: { type: integer }
+                      funded: { type: integer }
+                  invoices:
+                    type: array
+                    items: { $ref: '#/components/schemas/InvoiceRow' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/NotTheDesk' }
+  /api/invoices/{id}:
+    get:
+      summary: One deal room, as an object
+      description: The checks, the score, the price, the slices, the audit chain and the extraction for one invoice — everything the desk's page renders, including the desk's notebook.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^inv_[A-Za-z0-9]+$' }
+      responses:
+        '200':
+          description: The full deal-room object.
+          content:
+            application/json:
+              schema: { type: object }
+        '404':
+          description: No such invoice.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/NotTheDesk' }
+  /api/ledger:
+    get:
+      summary: The settlement book
+      description: Every double-entry posting grouped by transaction, the account totals, and the twenty most recent webhooks PayPal delivered.
+      responses:
+        '200':
+          description: Ledger rows, totals and recent webhooks.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        account: { type: string }
+                        kind: { type: string }
+                        txn_id: { type: string }
+                        memo: { type: string }
+                        debits: { type: integer }
+                        credits: { type: integer }
+                  totals:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        account: { type: string }
+                        kind: { type: string }
+                        debits: { type: integer }
+                        credits: { type: integer }
+                        balance: { type: integer }
+                  recentWebhooks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        received_at: { type: string, format: date-time }
+                        type: { type: string }
+                        verified: { type: integer }
+                        outcome: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/NotTheDesk' }
+  /webhooks/paypal:
+    post:
+      summary: PayPal webhook deliveries
+      description: |
+        Open to PayPal's delivery infrastructure without basic auth; the authority is PayPal's own
+        signature check, which the handler runs before anything else. An event whose signature does
+        not verify is stored as evidence with verified=0 and acts on nothing. A replay — the same
+        event id delivered twice — is answered 'duplicate' without a second row. Only
+        CUSTOMER.DISPUTE.CREATED, PAYMENT.CAPTURE.REFUNDED, PAYMENT.CAPTURE.REVERSED,
+        CUSTOMER.DISPUTE.RESOLVED and PAYMENT.CAPTURE.COMPLETED can change a position.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string, description: PayPal's event id; the replay key. }
+                event_type: { type: string }
+                resource: { type: object }
+      responses:
+        '200':
+          description: 'ok (verified and processed) | unverified, stored (kept as evidence, no action) | duplicate (replay).'
+        '400':
+          description: Body was not JSON.
+          content:
+            text/plain:
+              schema: { type: string }
+components:
+  responses:
+    Unauthorized:
+      description: No (or bad) credentials. Use one of the four demo usernames.
+    NotTheDesk:
+      description: The JSON surface is the desk's. The body names the signed-in role and the verb it lacks.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    StatusData:
+      type: object
+      properties:
+        sandbox: { type: boolean }
+        generatedAt: { type: string, format: date-time }
+        auditChain:
+          type: object
+          properties:
+            ok: { type: boolean }
+            length: { type: integer }
+            brokenAt: { type: [integer, 'null'] }
+            reason: { type: [string, 'null'] }
+        archiveCounts:
+          type: object
+          properties:
+            total: { type: integer }
+            refused: { type: integer }
+            verified: { type: integer }
+            funded: { type: integer }
+        ledgerTotals:
+          type: array
+          items: { type: object }
+        webhooksByType:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string }
+              n: { type: integer }
+              verified: { type: integer }
+        lastWebhookAt: { type: [string, 'null'], format: date-time }
+    InvoiceRow:
+      type: object
+      properties:
+        id: { type: string }
+        invoice_number: { type: string }
+        face_cents: { type: integer }
+        status: { type: string }
+        debtor_name: { type: string }
+        seller_name: { type: string }
+        score: { type: [integer, 'null'] }
+        band: { type: [string, 'null'] }
+        advance_cents: { type: [integer, 'null'] }

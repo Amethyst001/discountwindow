@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "The Discount Window — machine surface",
+    "description": "The read-only JSON surface of the Discount Window, matching docs/openapi.yaml. Import this collection, run the server (`npm start`), and read the book the way an agent would: no screen-scraping, no secrets, and no way to move money from here — that is the point. The desk-only routes use basic auth with username `desk`; on a public demo, use the password the README names.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "deskAuth", "value": "ZGVzazp0aGVzaGFyZWRwYXNzd29yZA==", "description": "Basic auth for desk:thesharedpassword — replace with the deployed demo's password. On localhost with no password configured, the desk needs no header at all." }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health",
+        "description": "Open to everyone: the audit chain re-walked on every call. If ok is false, the book has been tampered with and says so."
+      }
+    },
+    {
+      "name": "Status (JSON)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/status",
+        "description": "Aggregate vitals with no login: chain integrity, book counts, ledger balances, webhook summary."
+      }
+    },
+    {
+      "name": "The book",
+      "request": {
+        "auth": { "type": "basic", "basic": [{ "key": "username", "value": "desk" }, { "key": "password", "value": "thesharedpassword" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/api/invoices",
+        "description": "Every invoice with score, band, price and status. Add ?status=REFUSED for the refusal archive as data."
+      }
+    },
+    {
+      "name": "One deal room",
+      "request": {
+        "auth": { "type": "basic", "basic": [{ "key": "username", "value": "desk" }, { "key": "password", "value": "thesharedpassword" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/api/invoices/inv_A1051",
+        "description": "Replace the id with one from The book. Returns the eleven checks, the score, the price, the slices, the audit chain and the extraction — the whole deal room as an object."
+      }
+    },
+    {
+      "name": "The settlement book",
+      "request": {
+        "auth": { "type": "basic", "basic": [{ "key": "username", "value": "desk" }, { "key": "password", "value": "thesharedpassword" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/api/ledger",
+        "description": "Double-entry postings by transaction, account totals, and the last twenty webhooks PayPal delivered — with their signature verdicts."
+      }
+    },
+    {
+      "name": "Webhook delivery (forge one)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/webhooks/paypal",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"WH-FORGED-1\",\n  \"event_type\": \"PAYMENT.CAPTURE.REFUNDED\",\n  \"resource\": { \"id\": \"CAP-FORGED\", \"custom_id\": \"inv_A1051\", \"reason\": \"not from PayPal\" }\n}"
+        },
+        "description": "No basic auth on this route — its authority is PayPal's signature check. This forged event is stored with verified=0 and changes nothing: the answer is 'unverified, stored'. Send it twice: the replay is answered 'duplicate'."
+      }
+    }
+  ]
+}
