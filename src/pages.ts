@@ -1,7 +1,7 @@
 import { esc, join, layout } from './html.ts';
 import { formatCents } from './money.ts';
 import { paypalFeeOn, NON_RECOURSE_PREMIUM_BP } from './price.ts';
-import { jurisdictionFor, ruleTextFor, type Jurisdiction } from './gate.ts';
+import { jurisdictionFor, ruleTextFor, sellerActionFor, type Jurisdiction } from './gate.ts';
 import { roleAllows, holdersOf, type Role } from './auth.ts';
 
 const statusLabel: Record<string, string> = {
@@ -631,8 +631,15 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
     const gate = decisions.find((d: any) => d.kind === 'gate');
     try { return gate?.reasons_json ? JSON.parse(gate.reasons_json) : []; } catch { return []; }
   })();
-  const refusalCode = gateReasons[0]?.code ?? 'REFUSED';
-  const refusalRule = gateReasons[0]?.rule ?? '';
+  // A pricing refusal is a refusal with its own reason — the band's own verdict, not the gate's —
+  // and the card should say so rather than a bare REFUSED.
+  const pricingRefusal: any[] = (() => {
+    const pricing = decisions.find((d: any) => d.kind === 'pricing' && d.verdict === 'REFUSED');
+    try { return pricing?.reasons_json ? JSON.parse(pricing.reasons_json) : []; } catch { return []; }
+  })();
+  const refusalList: any[] = gateReasons.length ? gateReasons : pricingRefusal;
+  const refusalCode = refusalList[0]?.code ?? 'REFUSED';
+  const refusalRule = refusalList[0]?.rule ?? '';
   const reading = extractionReadBy(extraction);
 
   // A commitment is not money yet. When every share is committed but nothing has been captured,
@@ -648,6 +655,8 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
     `<h1>${esc(invoice.debtor_name)}</h1>`,
     `<p class="lede">${esc(invoice.seller_name)} invoiced ${formatCents(Number(invoice.face_cents))}, issued ${esc(invoice.issued_on)}, due ${esc(invoice.due_on)}.
       Status: <span class="${statusClass(invoice.status)}">${esc(statusText)}</span>.</p>`,
+    detail.resubmission?.of ? `<p class="note">Corrected submission of <a href="/invoices/${esc(detail.resubmission.of.id)}">${esc(detail.resubmission.of.invoiceNumber)}</a> (${esc(detail.resubmission.of.status)}). The refusal on that invoice stands; this is the document that answers it.</p>` : '',
+    detail.resubmission?.corrections?.length ? `<p class="note">A corrected submission exists: ${detail.resubmission.corrections.map((c: any) => `<a href="/invoices/${esc(c.id)}">${esc(c.invoiceNumber)}</a> (${esc(c.status)})`).join(', ')}.</p>` : '',
     roleCard(invoice, price, slices, view),
     overrideRow ? `<div class="override" style="margin-bottom:24px"><strong>Sandbox override applied to E00.</strong> PayPal did not return an eligible ${esc(profile.protectionProgram)} status for the sandbox account in use. The raw status is shown below, the override is written to the audit chain, and it cannot be enabled outside the sandbox.</div>` : '',
     uncorroborated ? `<div class="override" style="margin-bottom:24px"><strong>E00 found no rail transaction behind this sale.</strong> Nothing on PayPal corroborates it, so the desk is pricing on the documents and the debtor's record alone: a band-A score is held at B, and the advance ceiling falls with it. This is a stated absence, not a passed check.</div>` : '',
@@ -667,9 +676,23 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
       ${profileNote(profile)}
       ${refused ? `<div class="refusal" style="margin-bottom:18px">
         <h2>Refused</h2>
-        <p style="margin:0 0 10px">${esc(failing[0]?.detail ?? 'A check failed.')}</p>
-        <span class="code-chip">${esc(refusalCode)}</span>
-        <p class="small muted" style="margin:12px 0 0">Rule: ${esc(refusalRule)}</p>
+        <p style="margin:0 0 12px">${esc(failing[0]?.detail ?? 'A check failed.')}</p>
+        ${refusalList.length ? refusalList.map((g: any) => {
+          const fix = g.sellerAction ?? sellerActionFor(g.code) ?? '';
+          return `<div style="margin:0 0 14px">
+            <span class="code-chip">${esc(g.code ?? 'REFUSED')}</span>
+            ${g.rule ? `<p class="small muted" style="margin:8px 0 0">Rule: ${esc(g.rule)}</p>` : ''}
+            ${fix ? `<p class="small" style="margin:8px 0 0"><strong>What the seller can do:</strong> ${esc(fix)}</p>` : ''}
+          </div>`;
+        }).join('') : `<span class="code-chip">${esc(refusalCode)}</span><p class="small muted" style="margin:8px 0 0">Rule: ${esc(refusalRule)}</p>`}
+      </div>` : ''}
+      ${refused && mayPress('submit', identity) ? `<div class="card" style="margin-bottom:18px">
+        <h3>Fix this refusal</h3>
+        <p class="small muted" style="margin-top:0">Upload the corrected proof of delivery. A resubmission is a new receivable that names this one: the refusal and its audit entry stay exactly where they are, the seller's invoice number gains a revision, and the same document cannot come back — E06 will say so.</p>
+        <form method="post" action="/invoices/${esc(invoice.id)}/resubmit" enctype="multipart/form-data" style="margin:10px 0 0">
+          <p style="margin:0 0 10px"><input type="file" name="evidence" required></p>
+          <p style="margin:0"><button type="submit">Submit the corrected document</button></p>
+        </form>
       </div>` : ''}
       <div class="card">${checks.map((c: any) => checkRow(c, profile)).join('')}</div>
     </section>`,

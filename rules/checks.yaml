@@ -22,6 +22,10 @@ checks:
       NOT_ON_RAIL and the desk proceeds on the documents and the debtor's history alone, priced one
       band lower. These programmes cover eligible purchases rather than services, so an ineligibility
       means the rail declines this transaction — never that the goods behind the invoice are worthless.
+    seller_action: >-
+      There is nothing to fix on the paper: the rail has answered about this sale, and the desk still
+      prices it on the documents and the debtor's record, one band lower. If the sale should have run
+      through PayPal, ask the buyer to put it on the rail before offering the paper again.
     reads: [protection.status, protection.trackerId]
     refusal: PROTECTION_INELIGIBLE
     terminal: true
@@ -29,6 +33,9 @@ checks:
   - id: E01
     title: Proof of delivery is present and readable
     rule: A delivery document exists, decodes, and yields the fields this gate reads.
+    seller_action: >-
+      Attach the proof of delivery — the carrier's record, a scan, or a photograph of it. A
+      photograph is fine: two independent readers look at one.
     reads: [pod.present, pod.readable]
     refusal: POD_MISSING
     refusalWhenUnreadable: POD_UNREADABLE
@@ -37,6 +44,10 @@ checks:
   - id: E02
     title: The tracking number is well-formed for a known carrier
     rule: A carrier this desk recognises and a tracking number matching that carrier's published format appear on the proof of delivery. The carrier itself is not queried.
+    seller_action: >-
+      Check the tracking number against the carrier's own published format — one wrong digit reads
+      as a fabricated parcel — and check the carrier's name is one this desk reads. Then resubmit
+      the document with the number as the carrier wrote it.
     reads: [pod.carrier, pod.trackingNumber]
     refusal: TRACKING_INVALID
     terminal: true
@@ -44,6 +55,10 @@ checks:
   - id: E03
     title: The parcel was delivered, and recently
     rule: The document states delivered, and the delivery date falls within {deliveryWindowDays} days before the invoice date.
+    seller_action: >-
+      This desk buys delivered goods, not goods in transit. Send the proof for a delivery that has
+      actually happened; if the delivery is real but recent, let the carrier's record catch up and
+      resubmit with the completed document.
     reads: [pod.delivered, pod.deliveredOn, invoice.issuedOn]
     refusal: NOT_DELIVERED
     refusalWhenLate: DELIVERY_DATE_OUT_OF_WINDOW
@@ -52,6 +67,10 @@ checks:
   - id: E04
     title: It was delivered to the debtor
     rule: The consignee name matches the debtor's legal name after normalisation, or a recorded alias.
+    seller_action: >-
+      The name on the delivery must be the debtor's legal name. If the parcel genuinely went to the
+      debtor, attach the document that shows that name as the carrier recorded it — or ask the buyer
+      to have the consignee corrected on the carrier's record before offering the paper again.
     reads: [pod.consigneeName, debtor.legalName, debtor.aliases]
     refusal: CONSIGNEE_MISMATCH
     terminal: true
@@ -59,6 +78,10 @@ checks:
   - id: E05
     title: It went to the debtor's address
     rule: The delivery address matches the debtor's billing address on street, city and postal code.
+    seller_action: >-
+      The ship-to must match the debtor's address on street, city and postal code. If the buyer
+      receives at a branch, have the address the parcel actually went to recorded on the carrier's
+      proof, and resubmit with that document.
     reads: [pod.deliveryAddress, debtor.billingAddress]
     refusal: ADDRESS_MISMATCH
     terminal: true
@@ -70,6 +93,9 @@ checks:
       invoice in this book. The hash stops a re-upload of the same file; the tracking number stops
       one real delivery financing two receivables, which is the cheaper half of the fabricated-paper
       trick and the only half this desk can see without asking a carrier.
+    seller_action: >-
+      This document — or the tracking number on it — is already financing a receivable on this
+      desk. One delivery, one advance. Find the document that belongs to this invoice instead.
     reads: [evidence.sha256, pod.trackingNumber]
     refusal: EVIDENCE_REUSED
     terminal: true
@@ -77,6 +103,9 @@ checks:
   - id: E07
     title: This invoice has not been financed
     rule: The invoice number is unique for this debtor and is not attached to a funded or listed invoice.
+    seller_action: >-
+      This invoice number is already on this desk's book for this debtor. Offer the next invoice —
+      or, if this is meant as a correction, speak to the desk rather than renumbering it yourself.
     reads: [invoice.invoiceNumber, debtor.id]
     refusal: INVOICE_ALREADY_FINANCED
     terminal: true
@@ -84,6 +113,9 @@ checks:
   - id: E08
     title: The invoice arithmetic holds
     rule: The stated total equals the sum of the line items, and the purchase order reference matches when one was supplied.
+    seller_action: >-
+      Make the invoice's stated total equal the sum of its line items, and make sure the customer PO
+      reference on the invoice matches the one on the proof of delivery. Then resubmit both together.
     reads: [invoice.totalCents, invoice.lineItems, invoice.poRef, pod.poRef]
     refusal: AMOUNT_MISMATCH
     terminal: true
@@ -91,6 +123,9 @@ checks:
   - id: E09
     title: The terms are coherent
     rule: The issue date is not after the due date, and the tenor is no longer than {maximumTenorDays} days.
+    seller_action: >-
+      Fix the dates before resubmitting: an invoice cannot be issued after it falls due, and the
+      tenor cannot run past the {maximumTenorDays}-day cap this desk buys in this country.
     reads: [invoice.issuedOn, invoice.dueOn]
     refusal: TERMS_INVALID
     terminal: true
@@ -98,6 +133,9 @@ checks:
   - id: E10
     title: Someone took receipt
     rule: The proof of delivery carries a signature or a delivery photograph.
+    seller_action: >-
+      Get the signed delivery record — or the delivery photograph — from the carrier and attach it.
+      A signature is the one thing on the document that says a human took receipt.
     reads: [pod.hasSignature, pod.hasPhoto]
     refusal: NO_SIGNATURE_EVIDENCE
     terminal: true

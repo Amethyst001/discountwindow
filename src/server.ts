@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { config, isSandbox, assertSandbox } from './config.ts';
 import { basicAuthIdentity, roleAllows, type Identity } from './auth.ts';
 import { openDb, newId, nowIso } from './db.ts';
-import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, resolveWebhookInvoice, freezeForDispute, releaseFreeze, markCaptureCompleted, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim } from './store.ts';
+import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, resolveWebhookInvoice, freezeForDispute, releaseFreeze, markCaptureCompleted, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim, nextResubmissionNumber, recordResubmission } from './store.ts';
 import { storedNotice, recordNoticeService, noticeServiceCsv } from './notice.ts';
 import { renderBook, renderDealRoom, renderLedger, renderArchive, renderSubmit, renderStatus, viewOf } from './pages.ts';
 import { verifyChain, appendAudit } from './audit.ts';
@@ -364,6 +364,76 @@ const server = http.createServer(async (req, res) => {
         return send(res, 409, noticePage('Nothing to serve', 'No notice has been issued for this receivable: it has not been funded in full.', `/invoices/${id}`), 'text/html; charset=utf-8');
       }
       res.writeHead(303, { Location: `/invoices/${id}` });
+      return res.end();
+    }
+    // Fix-my-refusal: a corrected proof of delivery comes back as a new receivable that names the
+    // refused one. The refusal is terminal — nothing here reopens it; the new paper runs the same
+    // eleven checks with the same seller, debtor, face and terms, under a revision number, and the
+    // same document cannot come back because E06 still watches the hashes.
+    const resubmitMatch = /^\/invoices\/([A-Za-z0-9_]+)\/resubmit$/.exec(path);
+    if (req.method === 'POST' && resubmitMatch) {
+      if (deny('submit')) return;
+      const refusedId = resubmitMatch[1];
+      const refused = invoiceDetail(db, refusedId);
+      if (!refused) return send(res, 404, 'Not found', 'text/plain');
+      if (refused.invoice.status !== 'REFUSED') {
+        return send(res, 409, noticePage('Nothing to fix', 'Only a refused invoice can be resubmitted.', `/invoices/${refusedId}`), 'text/html; charset=utf-8');
+      }
+      const type = String(req.headers['content-type'] ?? '');
+      const boundary = /boundary=(.+)$/.exec(type)?.[1]?.replace(/^"|"$/g, '');
+      if (!boundary) return send(res, 400, 'expected multipart/form-data', 'text/plain');
+      const form = parseMultipart(await readRaw(req, 12_000_000), boundary);
+      const file = form.get('evidence');
+      const back = `/invoices/${refusedId}`;
+      if (!file || file.data.length === 0) return send(res, 400, noticePage('No document', 'Attach the corrected proof of delivery.', back), 'text/html; charset=utf-8');
+      const mime = sniffMime(file.data, file.mime);
+      if (!mime) return send(res, 400, noticePage('Not a document', 'That file is not a PDF, a text file, a PNG or a JPEG.', back), 'text/html; charset=utf-8');
+      const sha = crypto.createHash('sha256').update(file.data).digest('hex');
+      fs.mkdirSync(config.evidenceDir, { recursive: true });
+      const stored = nodePath.join(config.evidenceDir, `${sha}${mime === 'application/pdf' ? '.pdf' : mime === 'text/plain' ? '.txt' : mime === 'image/png' ? '.png' : '.jpg'}`);
+      if (!fs.existsSync(stored)) fs.writeFileSync(stored, file.data);
+      const extraction = await extractEvidence(file.data, mime);
+      const debtor = db.prepare('SELECT id, legal_name, billing_address_json, limit_cents FROM debtors WHERE id = ?').get(refused.invoice.debtor_id) as any;
+      if (!debtor) return send(res, 409, noticePage('Debtor missing', 'The debtor on the refused invoice is no longer on the book.', back), 'text/html; charset=utf-8');
+      const outcome = intakeInvoice(db, {
+        seller: { id: 'seller-northwind', name: 'Northwind Components LLC', country: 'US', paypalMerchantId: config.sellerEmail || undefined },
+        debtor: {
+          id: debtor.id,
+          name: debtor.legal_name,
+          billingAddress: JSON.parse(debtor.billing_address_json),
+          limitCents: Number(debtor.limit_cents)
+        },
+        invoice: {
+          invoiceNumber: nextResubmissionNumber(db, refusedId),
+          totalCents: Number(refused.invoice.face_cents),
+          issuedOn: refused.invoice.issued_on,
+          dueOn: refused.invoice.due_on,
+          poRef: refused.invoice.po_ref ?? extraction.invoiceHints.poRef ?? undefined,
+          lineItems: [{ description: 'Goods as invoiced (corrected evidence)', cents: Number(refused.invoice.face_cents) }]
+        },
+        pod: extraction.pod,
+        evidenceSha256: sha,
+        evidenceText: extraction.text,
+        evidence: {
+          path: stored, mime, bytes: file.data.length,
+          model: extraction.model, modelVersion: extraction.modelVersion,
+          raw: extraction.raw, confidence: extraction.confidence, notes: extraction.notes
+        },
+        protection: { status: 'UNKNOWN' },
+        recourse: 'recourse',
+        history: debtorHistory(db, debtor.id, Number(refused.invoice.face_cents)),
+        sandbox: isSandbox(),
+        allowProtectionOverride: ALLOW_OVERRIDE
+      });
+      recordResubmission(db, refusedId, outcome.invoiceId);
+      appendAudit(db, 'resubmission', outcome.invoiceId, {
+        refusedInvoiceId: refusedId,
+        refusedNumber: refused.invoice.invoice_number,
+        verdict: outcome.gate.verdict,
+        refusals: outcome.gate.refusals,
+        evidenceSha256: sha
+      });
+      res.writeHead(303, { Location: `/invoices/${outcome.invoiceId}` });
       return res.end();
     }
     const fundMatch = /^\/invoices\/([A-Za-z0-9_]+)\/fund$/.exec(path);

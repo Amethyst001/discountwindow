@@ -211,6 +211,16 @@ CREATE TABLE IF NOT EXISTS notice_service (
 
 CREATE INDEX IF NOT EXISTS idx_notice_service_invoice ON notice_service(invoice_id);
 
+-- A refused invoice stays refused; a corrected document comes back as a new receivable that names
+-- the one it fixes. The link is the paper trail that keeps a refusal terminal while the seller
+-- repairs the evidence.
+CREATE TABLE IF NOT EXISTS resubmissions (
+  id TEXT PRIMARY KEY,
+  refused_invoice_id TEXT NOT NULL REFERENCES invoices(id),
+  invoice_id TEXT NOT NULL UNIQUE REFERENCES invoices(id),
+  created_at TEXT NOT NULL
+);
+
 -- The register is read in the order the notices went out, and a file of every attempt is the answer to
 -- "show me what you served", which is a question about the whole book rather than one invoice.
 CREATE INDEX IF NOT EXISTS idx_notice_service_served ON notice_service(served_at, created_at, id);

@@ -31,8 +31,11 @@ const POD = {
   confidence: { trackingNumber: 0.97, consigneeName: 0.95, deliveredOn: 0.93, deliveryAddress: 0.91 }
 };
 
-/** One priced invoice, one funded invoice with a notice and a service entry, written before boot. */
-function seedBook(): { pricedId: string; fundedId: string } {
+const DOC_REFUSED = 'UPS PROOF OF DELIVERY\nTracking number: 1Z999AA10123456738\nStatus: DELIVERED\nConsignee: Meridian Trade Ltd\nDelivered on: 2026-09-22 at 10:05\nShip to: 4400 Congress Ave, Austin TX 78701\nCustomer PO: PO-88421\nSigned by: R. OKAFOR';
+const DOC_CORRECTED = 'UPS PROOF OF DELIVERY\nTracking number: 1Z999AA10123456754\nStatus: DELIVERED\nConsignee: Halcyon Retail Group\nDelivered on: 2026-09-22 at 11:40\nShip to: 4400 Congress Ave, Austin TX 78701\nCustomer PO: PO-88421\nSigned by: R. OKAFOR';
+
+/** One priced invoice, one funded invoice with a notice and a service entry, and one refused invoice, written before boot. */
+function seedBook(): { pricedId: string; fundedId: string; refusedId: string } {
   fs.rmSync(DB_PATH, { force: true });
   fs.rmSync(`${DB_PATH}-shm`, { force: true });
   fs.rmSync(`${DB_PATH}-wal`, { force: true });
@@ -69,15 +72,29 @@ function seedBook(): { pricedId: string; fundedId: string } {
     evidenceText: 'UPS PROOF OF DELIVERY\nTracking number: 1Z999AA10123456721\nStatus: DELIVERED\nConsignee: Halcyon Retail Group\nDelivered on: 2026-09-21 at 09:15\nShip to: 4400 Congress Ave, Austin TX 78701\nCustomer PO: PO-88421\nSigned by: R. OKAFOR',
     protection: { status: 'ELIGIBLE' as const, trackerId: '1Z999AA10123456721' }
   } as CreateInvoiceInput);
+  // A refusal the seller can answer: the parcel is real but the consignee is not the debtor.
+  const refused = intakeInvoice(db, {
+    ...base,
+    invoice: { ...base.invoice, invoiceNumber: 'H-3' },
+    pod: { ...POD, trackingNumber: '1Z999AA10123456738', consigneeName: 'Meridian Trade Ltd', deliveredOn: '2026-09-22' },
+    evidenceSha256: sha(DOC_REFUSED),
+    evidenceText: DOC_REFUSED,
+    protection: { status: 'ELIGIBLE' as const, trackerId: '1Z999AA10123456738' }
+  } as CreateInvoiceInput);
   db.prepare("INSERT INTO funders (id, legal_name, paypal_email, created_at) VALUES ('f1','Firstlight','funder@example.com',?)")
     .run(nowIso());
+  // The desk's declared record with this debtor, as a real book would carry it: without this row the
+  // resubmission is scored against an empty record and lands in band D, refused before its document
+  // ever gets to speak.
+  db.prepare("INSERT INTO debtor_history (debtor_id, invoices_due, paid_on_time, days_late_average, months_active, disputes) VALUES ('d1', 24, 16, 4.2, 18, 0)")
+    .run();
   db.prepare("UPDATE invoices SET status = 'funded' WHERE id = ?").run(funded.invoiceId);
   db.prepare("INSERT INTO slices (id, invoice_id, funder_id, share_bp, principal_cents, status, created_at) VALUES ('sl1',?,'f1',10000,3642801,'paid',?)")
     .run(funded.invoiceId, nowIso());
   issueAssignmentNotice(db, funded.invoiceId);
   recordNoticeService(db, funded.invoiceId, { channel: 'Recorded delivery, UK', reference: 'TW059301341GB', enteredBy: 'desk' });
   db.close();
-  return { pricedId: priced.invoiceId, fundedId: funded.invoiceId };
+  return { pricedId: priced.invoiceId, fundedId: funded.invoiceId, refusedId: refused.invoiceId };
 }
 
 const book = seedBook();
@@ -200,8 +217,8 @@ test('the machine surface: a public status page, a desk-only JSON API, and a web
     assert.match(listRes.headers.get('content-type') ?? '', /application\/json/);
     const list = JSON.parse(await listRes.text());
     assert.equal(Array.isArray(list.invoices), true);
-    assert.equal(list.invoices.length, 2);
-    assert.equal(list.counts.total, 2);
+    assert.equal(list.invoices.length, 3);
+    assert.equal(list.counts.total, 3);
     const detail = JSON.parse(await (await get(`/api/invoices/${book.pricedId}`, `desk:${DESK}`)).text());
     assert.ok(JSON.stringify(detail).includes('H-1'), 'the deal room object carries the invoice');
     assert.equal((await get('/api/invoices/NOPE', `desk:${DESK}`)).status, 404);
@@ -263,6 +280,58 @@ test('a webhook without a verifying signature is kept as evidence and never acts
     for (const w of refunds) assert.equal(w.verified, 0);
     const after2 = JSON.parse(await (await get(`/api/invoices/${book.fundedId}`, `desk:${DESK}`)).text());
     assert.equal(after2.invoice.status, 'funded');
+  } finally {
+    await stop();
+  }
+});
+
+test('fix-my-refusal: a corrected document comes back as a new receivable, and the refusal stands', async () => {
+  const stop = await boot();
+  try {
+    // The refused deal room carries the fix sentence from the rules — rules as data — and, for a
+    // name holding the submit verb, the resubmission door.
+    const refusedPage = await (await get(`/invoices/${book.refusedId}`, `desk:${DESK}`)).text();
+    assert.match(refusedPage, /What the seller can do/);
+    assert.match(refusedPage, /name on the delivery must be the debtor/);
+    assert.match(refusedPage, new RegExp(`action="/invoices/${book.refusedId}/resubmit"`));
+    // A funder reads the sentence — it is information — but is not shown the door, and pressing the
+    // route anyway answers 403.
+    const asFunder = await (await get(`/invoices/${book.refusedId}`, `funder:${SHARED}`)).text();
+    assert.match(asFunder, /What the seller can do/);
+    assert.doesNotMatch(asFunder, /resubmit/);
+    assert.equal((await post(`/invoices/${book.refusedId}/resubmit`, `funder:${SHARED}`)).status, 403);
+
+    // The corrected document: same trade, fixed consignee, a different file — a new hash.
+    const submit = (doc: string) => {
+      const form = new FormData();
+      form.append('evidence', new Blob([doc], { type: 'text/plain' }), 'pod.txt');
+      return fetch(`${BASE}/invoices/${book.refusedId}/resubmit`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { authorization: `Basic ${Buffer.from(`seller:${SHARED}`, 'utf8').toString('base64')}` },
+        body: form
+      });
+    };
+    const resub = await submit(DOC_CORRECTED);
+    assert.equal(resub.status, 303);
+    const newId = (resub.headers.get('location') ?? '').split('/').pop() ?? '';
+    assert.match(newId, /^inv_/, 'the resubmission lands on its own deal room');
+    const newPage = await (await get(`/invoices/${newId}`, `desk:${DESK}`)).text();
+    assert.match(newPage, /Corrected submission of/);
+    assert.doesNotMatch(newPage, /<h2>Refused<\/h2>/, 'the corrected document passes the same eleven checks');
+    // The refused original is not rewritten: it still says refused, and it names its correction.
+    const oldPage = await (await get(`/invoices/${book.refusedId}`, `desk:${DESK}`)).text();
+    assert.match(oldPage, /<h2>Refused<\/h2>/);
+    assert.match(oldPage, /A corrected submission exists/);
+
+    // And the same document cannot come back: the refused evidence itself, offered again, is a new
+    // receivable refused for reuse — with the fix sentence that says why.
+    const reused = await submit(DOC_REFUSED);
+    assert.equal(reused.status, 303);
+    const reusedId = (reused.headers.get('location') ?? '').split('/').pop() ?? '';
+    const reusedPage = await (await get(`/invoices/${reusedId}`, `desk:${DESK}`)).text();
+    assert.match(reusedPage, /EVIDENCE_REUSED/);
+    assert.match(reusedPage, /One delivery, one advance/);
   } finally {
     await stop();
   }

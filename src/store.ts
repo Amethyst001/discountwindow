@@ -258,7 +258,61 @@ export function invoiceDetail(db: DatabaseSync, id: string): any | null {
   // Only what the desk wrote about sending it. The page shows this to the desk view; the entries are
   // the operator's own statements, so they are not shown as though a carrier had confirmed them.
   const noticeService = noticeServiceLog(db, id);
-  return { invoice, checks, score, price, evidence, extraction, audit, slices, decisions, maturity, defaultEvent, notice, noticeService };
+  const resubmission = resubmissionLink(db, id);
+  return { invoice, checks, score, price, evidence, extraction, audit, slices, decisions, maturity, defaultEvent, notice, noticeService, resubmission };
+}
+
+/**
+ * The resubmission paper trail: the refused invoice a document corrects, and the corrected
+ * receivables a refusal has produced. The refusal itself is never rewritten — this is the link that
+ * keeps it terminal while the seller repairs the evidence.
+ */
+export function resubmissionLink(db: DatabaseSync, invoiceId: string): { of: { id: string; invoiceNumber: string; status: string } | null; corrections: { id: string; invoiceNumber: string; status: string }[] } {
+  const ofRow = db.prepare(`
+    SELECT r.refused_invoice_id AS id, i.invoice_number, i.status
+      FROM resubmissions r JOIN invoices i ON i.id = r.refused_invoice_id
+     WHERE r.invoice_id = ?`).get(invoiceId) as any;
+  const corrections = db.prepare(`
+    SELECT r.invoice_id AS id, i.invoice_number, i.status
+      FROM resubmissions r JOIN invoices i ON i.id = r.invoice_id
+     WHERE r.refused_invoice_id = ? ORDER BY r.created_at`).all(invoiceId) as any[];
+  return {
+    of: ofRow ? { id: ofRow.id, invoiceNumber: ofRow.invoice_number, status: ofRow.status } : null,
+    corrections: corrections.map((c) => ({ id: c.id, invoiceNumber: c.invoice_number, status: c.status }))
+  };
+}
+
+/**
+ * The revision number a resubmission of this refused paper will carry: find the original at the
+ * root of the correction chain, count every correction the chain already holds, and add one. The
+ * seller's invoice number is never rewritten — it gains a revision suffix, the way a corrected
+ * document does in the real world.
+ */
+export function nextResubmissionNumber(db: DatabaseSync, refusedInvoiceId: string): string {
+  let root = refusedInvoiceId;
+  for (;;) {
+    const parent = db.prepare('SELECT refused_invoice_id AS p FROM resubmissions WHERE invoice_id = ?').get(root) as any;
+    if (!parent?.p) break;
+    root = parent.p;
+  }
+  const rootNumber = (db.prepare('SELECT invoice_number FROM invoices WHERE id = ?').get(root) as any)?.invoice_number ?? '';
+  // The root is revision one implicitly; every correction already in the chain takes the next
+  // number, wherever in the chain it sits.
+  let corrections = 0;
+  const queue = [root];
+  while (queue.length) {
+    const current = queue.shift() as string;
+    const kids = db.prepare('SELECT invoice_id FROM resubmissions WHERE refused_invoice_id = ?').all(current) as any[];
+    corrections += kids.length;
+    for (const k of kids) queue.push(k.invoice_id);
+  }
+  return `${rootNumber}-R${corrections + 2}`;
+}
+
+/** Written by the resubmission route after the corrected intake lands. */
+export function recordResubmission(db: DatabaseSync, refusedInvoiceId: string, invoiceId: string): void {
+  db.prepare('INSERT INTO resubmissions (id, refused_invoice_id, invoice_id, created_at) VALUES (?,?,?,?)')
+    .run(newId('rs'), refusedInvoiceId, invoiceId, nowIso());
 }
 
 export function archiveSummary(db: DatabaseSync): any[] {

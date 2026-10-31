@@ -84,6 +84,24 @@ const RULES = YAML.parse(fs.readFileSync(path.join(ROOT, 'rules', 'checks.yaml')
 const RULE_BY_ID = new Map<string, any>((RULES.checks as any[]).map((c) => [c.id, c]));
 
 /**
+ * What the seller can do about each refusal, written next to the check that raises it — rules as
+ * data, the same as the checks themselves. A refusal that only says no is a dead end; this sentence
+ * is what makes the refusal the product.
+ */
+const SELLER_ACTION_BY_CODE = new Map<string, string>();
+for (const c of RULES.checks as any[]) {
+  for (const key of ['refusal', 'refusalWhenUnreadable', 'refusalWhenLate']) {
+    if (c[key] && c.seller_action && !SELLER_ACTION_BY_CODE.has(c[key])) {
+      SELLER_ACTION_BY_CODE.set(c[key], String(c.seller_action).trim());
+    }
+  }
+}
+
+export function sellerActionFor(code: string | null | undefined): string | null {
+  return SELLER_ACTION_BY_CODE.get(String(code ?? '')) ?? null;
+}
+
+/**
  * The jurisdiction is part of the rules, not of the code: which carriers this desk will believe,
  * what a postal code looks like, how stale a delivery may be, how long a tenor may run, and what
  * PayPal calls the protection behind the sale. Everything else — the eleven checks, the price, the
@@ -514,7 +532,13 @@ export function runGate(bundle: EvidenceBundle, options: GateOptions): GateOutco
 
   const refusals = checks
     .filter((c) => !c.passed && c.refusalCode !== null)
-    .map((c) => ({ code: c.refusalCode as string, checkId: c.checkId, rule: c.rule, region: c.evidenceRegion }));
+    .map((c) => ({
+      code: c.refusalCode as string,
+      checkId: c.checkId,
+      rule: c.rule,
+      region: c.evidenceRegion,
+      sellerAction: sellerActionFor(c.refusalCode)
+    }));
 
   return {
     verdict: refusals.length === 0 ? 'VERIFIED' : 'REFUSED',

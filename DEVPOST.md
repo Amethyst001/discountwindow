@@ -47,7 +47,7 @@ counts are read from the data by the app; they are not copy.
 
 ## What it does
 
-1. **Intake.** The seller uploads the invoice and the proof of delivery.
+1. **Intake.** The seller uploads the invoice and the proof of delivery. A refusal is not a dead end: the refused deal room carries the fix sentence for the check that failed, and a corrected document comes back as a resubmission that names the refusal — which stays refused in the audit chain, and whose evidence can never finance a second receivable.
 2. **Read twice.** A language model and a deterministic label parser both read the document. Their
    answers are reconciled field by field; a disagreement halves the confidence, and a field under the
    0.70 floor can fail a check but cannot pass one — the guard sits in the gate, not on the page. The
