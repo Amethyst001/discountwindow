@@ -90,7 +90,10 @@ async function boot(): Promise<() => Promise<void>> {
       DB_PATH, EVIDENCE_DIR, PORT: String(PORT),
       DEMO_PASSWORD: SHARED, DEMO_PASSWORD_DESK: DESK,
       // The readers are optional and must not be reached from a test: no key, no network.
-      EXTRACT_API_KEY: '', EXTRACT_B_API_KEY: ''
+      EXTRACT_API_KEY: '', EXTRACT_B_API_KEY: '',
+      // And the webhook id is deliberately empty, so a forged event fails its signature check
+      // locally instead of asking PayPal to verify it over the network.
+      PAYPAL_WEBHOOK_ID: ''
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -211,6 +214,55 @@ test('the machine surface: a public status page, a desk-only JSON API, and a web
     const hook = await fetch(`${BASE}/webhooks/paypal`, { method: 'POST', body: 'not json' });
     assert.equal(hook.status, 400);
     assert.equal((await get('/webhooks/paypal')).status, 401);
+  } finally {
+    await stop();
+  }
+});
+
+test('a webhook without a verifying signature is kept as evidence and never acts; a replay is answered once', async () => {
+  const stop = await boot();
+  try {
+    // The event is well-formed and names a real funded invoice through its custom_id. With no
+    // webhook id configured, the signature check cannot run — so this is exactly what an
+    // attacker's forged POST looks like: the right shape, no PayPal signature.
+    const event = {
+      id: 'WH-TEST-REPLAY-1',
+      event_type: 'PAYMENT.CAPTURE.REFUNDED',
+      resource: { id: 'CAP-TEST-1', custom_id: book.fundedId, reason: 'forged refund' }
+    };
+    const post1 = await fetch(`${BASE}/webhooks/paypal`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event)
+    });
+    assert.equal(post1.status, 200);
+    assert.equal(await post1.text(), 'unverified, stored');
+
+    // Stored as evidence, and the position it names is untouched: no freeze, no status change.
+    const after1 = JSON.parse(await (await get(`/api/invoices/${book.fundedId}`, `desk:${DESK}`)).text());
+    assert.equal(after1.invoice.status, 'funded');
+
+    // The replay — same event id, byte for byte — is answered 'duplicate' and does not add a row.
+    const replay = await fetch(`${BASE}/webhooks/paypal`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event)
+    });
+    assert.equal(replay.status, 200);
+    assert.equal(await replay.text(), 'duplicate');
+
+    // A different event id carrying the same forged content is a new delivery: stored again,
+    // unverified again, still no action.
+    const event2 = { ...event, id: 'WH-TEST-REPLAY-2' };
+    const post2 = await fetch(`${BASE}/webhooks/paypal`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event2)
+    });
+    assert.equal(await post2.text(), 'unverified, stored');
+
+    // Two unverified refunds delivered; the machine surface shows both as signature-unverified,
+    // and the invoice is still funded.
+    const ledger = JSON.parse(await (await get('/api/ledger', `desk:${DESK}`)).text());
+    const refunds = ledger.recentWebhooks.filter((w: any) => w.type === 'PAYMENT.CAPTURE.REFUNDED');
+    assert.equal(refunds.length, 2);
+    for (const w of refunds) assert.equal(w.verified, 0);
+    const after2 = JSON.parse(await (await get(`/api/invoices/${book.fundedId}`, `desk:${DESK}`)).text());
+    assert.equal(after2.invoice.status, 'funded');
   } finally {
     await stop();
   }

@@ -14,10 +14,17 @@ sample and by tests, and is labelled as such wherever it appears.
 
 ## The problem it solves
 
-An invoice financier loses money on three things: goods that were never delivered, delivery to
-someone who is not the debtor, and the same paperwork funded twice. All three are visible in the
-document set before a dollar is advanced — if someone actually opens the documents and compares them
-against the debtor record. At volume nobody does.
+A component maker in Aba sells parts to a buyer in Texas on net-60 terms. The factory has to run
+before the money arrives, and the financier who would advance against the invoice is betting on
+documents — and losing on three of them: goods that were never delivered, delivery to someone who
+is not the debtor, and the same paperwork funded twice. All three are visible in the document set
+before a dollar is advanced — if someone actually opens the documents and compares them against the
+debtor record. At volume nobody does.
+
+PayPal can now reach that seller: since January 2026, PayPal accounts in Nigeria can receive
+cross-border payments into a linked Paga wallet. The gate underneath is not regional — the same
+eleven checks read a US freight proof of delivery and a GB wholesaler's paperwork, because a
+jurisdiction is a block of YAML, not a change to the money code.
 
 This desk does that comparison as a gate. Refusals are the product: 625 of the 1,005 invoices the seed
 produces today are refused, each with a machine-readable reason (`POD_MISSING`,

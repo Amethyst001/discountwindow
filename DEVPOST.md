@@ -3,10 +3,11 @@
 **Receivables, gated on proof.**
 
 A $48,000 parts invoice is refused in seconds because the signature block names a different
-company than the debtor. A $4,200 invoice from the same seller passes eleven checks, is priced from
-the debtor's own payment history, and is funded by a single PayPal order that pays the seller's
-advance and the platform fee in one capture. Both outcomes are on the same page, with the document,
-the hash and the reason.
+company than the debtor. A $4,200 invoice from the same seller passes the same eleven checks and is
+priced from the debtor's own payment history — the advance sitting ready for the funder's click. A
+separate order, on a smaller invoice, has already been funded for real: one PayPal order, one
+capture, two payees paid. Both outcomes — the refusal and the funding — are on the same page, with
+the document, the hash and the reason.
 
 **Sandbox only.** Every payment in this build ran against `api-m.sandbox.paypal.com`; no real money
 moves. The client refuses to start against any other host — a literal hostname-and-scheme check, not a
@@ -21,12 +22,22 @@ code path was deleted — see *Why PayPal*.
 
 ## The problem
 
-A freight-invoice financier loses money on three things: goods that were never delivered, delivery
-to someone who is not the debtor, and the same paperwork funded twice. All three are visible in the
-document set before a dollar is advanced — if someone opens the documents and compares them against
-the debtor record. At volume nobody does.
+A component maker in Aba sells parts to a buyer in Texas on net-60 terms. The factory has to run
+before the money arrives, and the financier who would advance against the invoice is betting on
+documents — and losing on three of them: goods that were never delivered, delivery to someone who
+is not the debtor, and the same paperwork funded twice. Catching that means opening the documents
+and comparing them against the debtor's record. At volume, nobody does.
 
-So the desk does it, and makes the refusal the product. On the seeded book, **625 of 1,005 invoices
+PayPal can now reach that seller. Since January 2026, PayPal accounts in Nigeria can receive
+cross-border payments into a linked Paga wallet — the receiving leg that twenty years of
+send-only had kept closed — and the buyer in Texas already pays from a wallet. Both ends of the
+trade are on one rail.
+
+The gate underneath is not regional. The same eleven checks read a US freight proof of delivery and
+a GB wholesaler's paperwork, because a jurisdiction is a block of YAML (`rules/jurisdictions.yaml`),
+not a change to the money code.
+
+So the desk does the comparison, and makes the refusal the product. On the seeded book, **625 of 1,005 invoices
 are refused** — 620 of them by the evidence gate, each with a machine-readable reason the seller can
 act on: `POD_MISSING` (211), `ADDRESS_MISMATCH` (148), `CONSIGNEE_MISMATCH` (97), `TRACKING_INVALID` (74),
 `NOT_DELIVERED` (26), `DELIVERY_DATE_OUT_OF_WINDOW` (26) and `NO_SIGNATURE_EVIDENCE` (38). The other five
@@ -125,7 +136,8 @@ wallet and the dispute history is already on the rail. That history is the colla
 the demo pair is a components supplier and the retail chain it ships to, rather than a trucking
 company: a goods sale is the case PayPal's protection programme can vouch for, and a carriage bill is
 a service it cannot — the demotion described above, not a hypothetical. The seller gets paid in two
-days instead of forty-five; the debtor pays what it owes, once, in the instrument it already uses;
+days instead of the sixty the terms promised; the debtor pays what it owes, once, in the instrument
+it already uses;
 and the desk's fee is priced into the advance rather than held as a balance by the desk. On a rail
 that pays a single merchant account the desk *would* have to redistribute, which is why the claim is
 scoped to this one.
