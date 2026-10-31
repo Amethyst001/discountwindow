@@ -1,0 +1,30 @@
+{
+  "ranAt": "2026-10-29T23:05:48.603Z",
+  "http": 201,
+  "order": {
+    "id": "1TD92077S84307342",
+    "status": "CREATED",
+    "links": [
+      {
+        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/1TD92077S84307342",
+        "rel": "self",
+        "method": "GET"
+      },
+      {
+        "href": "https://www.sandbox.paypal.com/checkoutnow?token=1TD92077S84307342",
+        "rel": "approve",
+        "method": "GET"
+      },
+      {
+        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/1TD92077S84307342",
+        "rel": "update",
+        "method": "PATCH"
+      },
+      {
+        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/1TD92077S84307342/capture",
+        "rel": "capture",
+        "method": "POST"
+      }
+    ]
+  }
+}

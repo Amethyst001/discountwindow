@@ -1,0 +1,156 @@
+{
+  "generatedAt": "2026-10-30T16:52:53.758Z",
+  "image": {
+    "file": "evidence/published/x11-degraded-scan.jpg",
+    "mime": "image/jpeg",
+    "bytes": 46703,
+    "sha256": "6d16bba15ad31125b7142cdbf256d463096d59662df4c01da2c90e618a75a5c2"
+  },
+  "readers": {
+    "a": {
+      "model": "gemini-3.8-flash-free",
+      "base": "https://api.beatapi.io/v1"
+    },
+    "b": {
+      "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "base": "https://integrate.api.nvidia.com/v1"
+    }
+  },
+  "elapsedMs": 35897,
+  "model": "gemini-3.8-flash-free + nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "perReaderRaw": [
+    {
+      "carrier": "FedEx",
+      "trackingNumber": "120098780",
+      "delivered": true,
+      "deliveredOn": "2026-10-27",
+      "consigneeName": "Halcyon Retail Group",
+      "deliveryAddress": {
+        "line1": "4400 Congress Ave",
+        "city": "Austin",
+        "state": "TX",
+        "postalCode": "78701",
+        "countryCode": "US"
+      },
+      "hasSignature": true,
+      "hasPhoto": false,
+      "poRef": "PO-88464",
+      "invoiceNumber": "INV A-1054",
+      "confidence": {
+        "trackingNumber": 0.5,
+        "consigneeName": 1,
+        "deliveredOn": 1,
+        "deliveryAddress": 0.9,
+        "hasSignature": 1,
+        "delivered": 1
+      },
+      "transcription": "NORTHWIND FREIGHT - PROOF OF DELIVERY\nDoc type: bill of lading / delivery receipt\nCarrier: FedEx\nTracking numb    120098780\nStatus: DELIVERED\nDelivered on: 2026-10-27 at 14:05\nConsignee: Halcyon Retail Group\nShip to: 4400 Congress Ave, Austin TX 78701\nCustomer PO: PO-88464\nReference: INV A-1054\nPieces: 3 Weight: 412 lb\nSIGNED BY (print): R. OKONKO\nSignature: R. Okonko\nSignature captured on device. Retain 90 days.\nRECEIVED\n2026 OCT 27 PM 2:11"
+    },
+    {
+      "carrier": "FedEx",
+      "trackingNumber": "120098780",
+      "delivered": true,
+      "deliveredOn": "2026-10-27",
+      "consigneeName": "Halcyon Retail Group",
+      "deliveryAddress": {
+        "line1": "4400 Congress Ave",
+        "city": "Austin",
+        "state": "TX",
+        "postalCode": "78701",
+        "countryCode": "US"
+      },
+      "hasSignature": true,
+      "hasPhoto": false,
+      "poRef": "PO-88464",
+      "invoiceNumber": "INV A-1054",
+      "confidence": {
+        "trackingNumber": 1,
+        "consigneeName": 1,
+        "deliveredOn": 1,
+        "deliveryAddress": 1,
+        "hasSignature": 1,
+        "delivered": 1
+      },
+      "transcription": "NORTHWIND FREIGHT - PROOF OF DELIVERY\nDoc type: bill of lading / delivery receipt\nCarrier: FedEx\nTracking num120098780\nStatus: DELIVERED\nDelivered on: 2026-10-27 at 14:05\nConsignee: Halcyon Retail Group\nShip to: 4400 Congress Ave, Austin TX 78701\nCustomer PO: PO-88464\nReference: INV A-1054\nPieces: 3 Weight: 412 lb\nSIGNED BY (print): R. OKONKO\nSignature: R. Okonko\nSignature captured on device. Retain 98 days.\nRECEIVED\n2026 OCT 27 PM 2:11"
+    }
+  ],
+  "labelParser": {
+    "pod": {
+      "present": true,
+      "readable": true,
+      "carrier": "FedEx",
+      "delivered": true,
+      "deliveredOn": "2026-10-27",
+      "consigneeName": "Halcyon Retail Group",
+      "deliveryAddress": {
+        "line1": "4400 Congress Ave",
+        "city": "Austin",
+        "state": "TX",
+        "postalCode": "78701",
+        "countryCode": "US"
+      },
+      "hasSignature": true,
+      "hasPhoto": false,
+      "poRef": "PO-88464"
+    },
+    "invoiceHints": {
+      "poRef": "PO-88464"
+    },
+    "confidence": {
+      "delivered": 0.95,
+      "deliveredOn": 0.93,
+      "consigneeName": 0.95,
+      "deliveryAddress": 0.91,
+      "hasSignature": 0.6,
+      "poRef": 0.9
+    }
+  },
+  "used": {
+    "present": true,
+    "readable": true,
+    "carrier": "FedEx",
+    "trackingNumber": "120098780",
+    "delivered": true,
+    "deliveredOn": "2026-10-27",
+    "consigneeName": "Halcyon Retail Group",
+    "deliveryAddress": {
+      "line1": "4400 Congress Ave",
+      "city": "Austin",
+      "state": "TX",
+      "postalCode": "78701",
+      "countryCode": "US"
+    },
+    "hasSignature": true,
+    "hasPhoto": false,
+    "poRef": "PO-88464",
+    "confidence": {
+      "trackingNumber": 0.75,
+      "consigneeName": 1,
+      "deliveredOn": 1,
+      "hasSignature": 1,
+      "delivered": 1,
+      "deliveryAddress": 1
+    }
+  },
+  "confidence": {
+    "trackingNumber": 0.75,
+    "consigneeName": 1,
+    "deliveredOn": 1,
+    "hasSignature": 1,
+    "delivered": 1,
+    "deliveryAddress": 1
+  },
+  "verdicts": {
+    "trackingNumber": 0.75,
+    "consigneeName": 1,
+    "deliveredOn": 1,
+    "hasSignature": 1,
+    "delivered": 1,
+    "deliveryAddress": 1
+  },
+  "notes": [
+    "the text layer came from the vision pass over this photograph, not from the file",
+    "two independent reads of the photograph (gemini-3.8-flash-free and nvidia/nemotron-3.5-super-vl-120b-a12b)",
+    "trackingNumber: found by gemini-3.8-flash-free + nvidia/nemotron-3.5-super-vl-120b-a12b only (no value from label parser)"
+  ]
+}

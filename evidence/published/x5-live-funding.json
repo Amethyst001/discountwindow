@@ -1,0 +1,113 @@
+{
+  "ranAt": "2026-10-30T00:01:05.881Z",
+  "flow": "app POST /invoices/:id/fund -> sandbox approval -> app POST /invoices/:id/capture",
+  "order": {
+    "id": "07H42099RL265081V",
+    "status": "COMPLETED",
+    "units": [
+      {
+        "ref": "seller",
+        "payee": "dw-seller-01@example.com",
+        "amount": "489.76",
+        "captures": [
+          {
+            "id": "7G077633WE973480T",
+            "status": "PENDING",
+            "sp": "NOT_ELIGIBLE"
+          }
+        ]
+      },
+      {
+        "ref": "platform",
+        "payee": "dw-platform-01@example.com",
+        "amount": "3.25",
+        "captures": [
+          {
+            "id": "8XN5263642050782V",
+            "status": "PENDING",
+            "sp": "NOT_ELIGIBLE"
+          }
+        ]
+      }
+    ]
+  },
+  "invoice": {
+    "invoice_number": "NW-2277",
+    "status": "funded",
+    "face_cents": 65000
+  },
+  "slice": {
+    "share_bp": 10000,
+    "principal_cents": 49301,
+    "status": "paid"
+  },
+  "commitment": [
+    {
+      "paypal_order_id": "07H42099RL265081V",
+      "capture_id": "7G077633WE973480T,8XN5263642050782V",
+      "amount_cents": 49301,
+      "status": "captured"
+    },
+    {
+      "paypal_order_id": "07H42099RL265081V:7G077633WE973480T",
+      "capture_id": "7G077633WE973480T,8XN5263642050782V",
+      "amount_cents": 48976,
+      "status": "captured"
+    },
+    {
+      "paypal_order_id": "07H42099RL265081V:8XN5263642050782V",
+      "capture_id": "7G077633WE973480T,8XN5263642050782V",
+      "amount_cents": 325,
+      "status": "captured"
+    }
+  ],
+  "ledger": [
+    {
+      "txn_id": "fund:inv_12ecdd92d63b47f89dc0:funder-demo",
+      "code": "funder:funder-demo:outlay",
+      "kind": "asset",
+      "debit_cents": 49301,
+      "credit_cents": 0,
+      "memo": "funder outlay for a verified slice"
+    },
+    {
+      "txn_id": "fund:inv_12ecdd92d63b47f89dc0:funder-demo",
+      "code": "seller:seller-northwind:advance",
+      "kind": "liability",
+      "debit_cents": 0,
+      "credit_cents": 48976,
+      "memo": "advance paid to seller"
+    },
+    {
+      "txn_id": "fund:inv_12ecdd92d63b47f89dc0:funder-demo",
+      "code": "platform:fee_revenue",
+      "kind": "revenue",
+      "debit_cents": 0,
+      "credit_cents": 325,
+      "memo": "origination fee"
+    }
+  ],
+  "audit": {
+    "ok": true,
+    "length": 1422,
+    "brokenAt": null,
+    "reason": null
+  },
+  "auditTail": [
+    {
+      "seq": 1422,
+      "kind": "funding_capture",
+      "hash": "347f14689665ebe10c7a5d32f0a56dcd00e9f3f0481c3bf00661efc1e2a48b49"
+    },
+    {
+      "seq": 1421,
+      "kind": "funding_order",
+      "hash": "c55932ce7b2bd34dbcadb545264aeddcc45cef16198a681350750ea8cb21eef2"
+    },
+    {
+      "seq": 1420,
+      "kind": "price",
+      "hash": "d1310b2e6be32d4317b2150a423660c25b766faf131d8e86b93707863cfe113c"
+    }
+  ]
+}

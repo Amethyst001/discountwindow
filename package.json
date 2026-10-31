@@ -1,0 +1,20 @@
+{
+  "name": "discount-window",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A receivables exchange where nothing is listed for funding until an agent has verified the delivery evidence.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.ts",
+    "test": "node --test --disable-warning=ExperimentalWarning \"tests/*.test.ts\"",
+    "seed": "node --disable-warning=ExperimentalWarning src/seed.ts"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.10.38",
+    "yaml": "^2.6.1"
+  }
+}

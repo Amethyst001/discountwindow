@@ -1,0 +1,83 @@
+{
+  "ranAt": "2026-10-29T23:00:21.216Z",
+  "status": 201,
+  "body": {
+    "id": "4MK94760HY727411X",
+    "status": "COMPLETED",
+    "payment_source": {
+      "paypal": {
+        "email_address": "sb-s2ofz53612998@personal.example.com",
+        "account_id": "P3MJCPDVGZ69Q",
+        "account_status": "VERIFIED",
+        "name": {
+          "given_name": "John",
+          "surname": "Doe"
+        },
+        "address": {
+          "country_code": "US"
+        }
+      }
+    },
+    "purchase_units": [
+      {
+        "reference_id": "slice-1",
+        "payments": {
+          "captures": [
+            {
+              "id": "6HE796326B655533X",
+              "status": "PENDING",
+              "status_details": {
+                "reason": "UNILATERAL"
+              },
+              "amount": {
+                "currency_code": "USD",
+                "value": "1.00"
+              },
+              "final_capture": true,
+              "seller_protection": {
+                "status": "NOT_ELIGIBLE"
+              },
+              "links": [
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/6HE796326B655533X",
+                  "rel": "self",
+                  "method": "GET"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/6HE796326B655533X/refund",
+                  "rel": "refund",
+                  "method": "POST"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/checkout/orders/4MK94760HY727411X",
+                  "rel": "up",
+                  "method": "GET"
+                }
+              ],
+              "create_time": "2026-10-29T23:00:21Z",
+              "update_time": "2026-10-29T23:00:21Z"
+            }
+          ]
+        }
+      }
+    ],
+    "payer": {
+      "name": {
+        "given_name": "John",
+        "surname": "Doe"
+      },
+      "email_address": "sb-s2ofz53612998@personal.example.com",
+      "payer_id": "P3MJCPDVGZ69Q",
+      "address": {
+        "country_code": "US"
+      }
+    },
+    "links": [
+      {
+        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/4MK94760HY727411X",
+        "rel": "self",
+        "method": "GET"
+      }
+    ]
+  }
+}

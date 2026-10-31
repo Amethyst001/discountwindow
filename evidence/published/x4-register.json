@@ -1,0 +1,51 @@
+{
+  "ranAt": "2026-10-30T00:33:03.990Z",
+  "publicUrl": "https://degree-couple-menu-crossword.trycloudflare.com",
+  "mode": "register",
+  "register": {
+    "status": 201,
+    "body": {
+      "id": "5G0253908N2745719",
+      "url": "https://degree-couple-menu-crossword.trycloudflare.com/webhooks/paypal",
+      "event_types": [
+        {
+          "name": "CUSTOMER.DISPUTE.CREATED",
+          "description": "A customer dispute is created."
+        },
+        {
+          "name": "CUSTOMER.DISPUTE.RESOLVED",
+          "description": "A customer dispute is resolved."
+        },
+        {
+          "name": "PAYMENT.CAPTURE.COMPLETED",
+          "description": "A payment capture completes."
+        },
+        {
+          "name": "PAYMENT.CAPTURE.DENIED",
+          "description": "A payment capture is denied."
+        },
+        {
+          "name": "PAYMENT.CAPTURE.REFUNDED",
+          "description": "A merchant refunds a payment capture."
+        }
+      ],
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v1/notifications/webhooks/5G0253908N2745719",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://api.sandbox.paypal.com/v1/notifications/webhooks/5G0253908N2745719",
+          "rel": "update",
+          "method": "PATCH"
+        },
+        {
+          "href": "https://api.sandbox.paypal.com/v1/notifications/webhooks/5G0253908N2745719",
+          "rel": "delete",
+          "method": "DELETE"
+        }
+      ]
+    }
+  }
+}

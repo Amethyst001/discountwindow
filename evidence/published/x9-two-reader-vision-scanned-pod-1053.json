@@ -1,0 +1,159 @@
+{
+  "generatedAt": "2026-10-30T14:57:29.037Z",
+  "image": {
+    "file": "temp/scanned-pod-1053.jpg",
+    "mime": "image/jpeg",
+    "bytes": 195298,
+    "sha256": "a17b3b791a4cd928e87dc23b48f708263447ca0ab9a3c658b23aaf29ac623041",
+    "committedAs": "evidence/published/x9-scanned-pod-1053.jpg"
+  },
+  "readers": {
+    "a": {
+      "model": "gemini-3.8-flash-free",
+      "base": "https://api.beatapi.io/v1"
+    },
+    "b": {
+      "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "base": "https://integrate.api.nvidia.com/v1"
+    }
+  },
+  "elapsedMs": 36681,
+  "model": "gemini-3.8-flash-free + nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "perReaderRaw": [
+    {
+      "carrier": "FedEx",
+      "trackingNumber": "774120098772",
+      "delivered": true,
+      "deliveredOn": "2026-10-27",
+      "consigneeName": "Halcyon Retail Group",
+      "deliveryAddress": {
+        "line1": "4400 Congress Ave",
+        "city": "Austin",
+        "state": "TX",
+        "postalCode": "78701",
+        "countryCode": "US"
+      },
+      "hasSignature": true,
+      "hasPhoto": false,
+      "poRef": "PO-88463",
+      "invoiceNumber": "INV A-1053",
+      "confidence": {
+        "trackingNumber": 1,
+        "consigneeName": 1,
+        "deliveredOn": 1,
+        "deliveryAddress": 1,
+        "hasSignature": 1,
+        "delivered": 1
+      },
+      "transcription": "NORTHWIND FREIGHT - PROOF OF DELIVERY\nDoc type:  bill of lading / delivery receipt\nCarrier:   FedEx\nTracking number: 774120098772\nStatus:    DELIVERED\nDelivered on: 2026-10-27 at 14:05\nConsignee: Halcyon Retail Group\nShip to:   4400 Congress Ave, Austin TX 78701\nCustomer PO: PO-88463\nReference: INV A-1053\nPieces: 3   Weight: 412 lb\nSIGNED BY (print):  R. OKONKO\nSignature:\nSignature captured on device. Retain 90 days.\nRECEIVED\n2026 OCT 27  PM 2:11"
+    },
+    {
+      "carrier": "FedEx",
+      "trackingNumber": "774120098772",
+      "delivered": true,
+      "deliveredOn": "2026-10-27",
+      "consigneeName": "Halcyon Retail Group",
+      "deliveryAddress": {
+        "line1": "4400 Congress Ave",
+        "city": "Austin",
+        "state": "TX",
+        "postalCode": "78701",
+        "countryCode": "US"
+      },
+      "hasSignature": true,
+      "hasPhoto": false,
+      "poRef": "PO-88463",
+      "invoiceNumber": "INV A-1053",
+      "confidence": {
+        "trackingNumber": 1,
+        "consigneeName": 1,
+        "deliveredOn": 1,
+        "deliveryAddress": 1,
+        "hasSignature": 1,
+        "delivered": 1
+      },
+      "transcription": "NORTHWIND FREIGHT - PROOF OF DELIVERY\nDoc type: bill of lading / delivery receipt\nCarrier: FedEx\nTracking number: 774120098772\nStatus: DELIVERED\nDelivered on: 2026-10-27 at 14:05\nConsignee: Halcyon Retail Group\nShip to: 4400 Congress Ave, Austin TX 78701\nCustomer PO: PO-88463\nReference: INV A-1053\nPieces: 3 Weight: 412 lb\nSIGNED BY (print): R. OKONKO\nSignature: R. Okonko\nSignature captured on device. Retain 90 days.\nRECEIVED\n2026 OCT 27 PM 2:11"
+    }
+  ],
+  "labelParser": {
+    "pod": {
+      "present": true,
+      "readable": true,
+      "carrier": "FedEx",
+      "trackingNumber": "774120098772",
+      "delivered": true,
+      "deliveredOn": "2026-10-27",
+      "consigneeName": "Halcyon Retail Group",
+      "deliveryAddress": {
+        "line1": "4400 Congress Ave",
+        "city": "Austin",
+        "state": "TX",
+        "postalCode": "78701",
+        "countryCode": "US"
+      },
+      "hasSignature": true,
+      "hasPhoto": false,
+      "poRef": "PO-88463"
+    },
+    "invoiceHints": {
+      "poRef": "PO-88463"
+    },
+    "confidence": {
+      "trackingNumber": 0.95,
+      "delivered": 0.95,
+      "deliveredOn": 0.93,
+      "consigneeName": 0.95,
+      "deliveryAddress": 0.91,
+      "hasSignature": 0.6,
+      "poRef": 0.9
+    }
+  },
+  "used": {
+    "present": true,
+    "readable": true,
+    "carrier": "FedEx",
+    "trackingNumber": "774120098772",
+    "delivered": true,
+    "deliveredOn": "2026-10-27",
+    "consigneeName": "Halcyon Retail Group",
+    "deliveryAddress": {
+      "line1": "4400 Congress Ave",
+      "city": "Austin",
+      "state": "TX",
+      "postalCode": "78701",
+      "countryCode": "US"
+    },
+    "hasSignature": true,
+    "hasPhoto": false,
+    "poRef": "PO-88463",
+    "confidence": {
+      "trackingNumber": 1,
+      "consigneeName": 1,
+      "deliveredOn": 1,
+      "hasSignature": 1,
+      "delivered": 1,
+      "deliveryAddress": 1
+    }
+  },
+  "confidence": {
+    "trackingNumber": 1,
+    "consigneeName": 1,
+    "deliveredOn": 1,
+    "hasSignature": 1,
+    "delivered": 1,
+    "deliveryAddress": 1
+  },
+  "verdicts": {
+    "trackingNumber": 1,
+    "consigneeName": 1,
+    "deliveredOn": 1,
+    "hasSignature": 1,
+    "delivered": 1,
+    "deliveryAddress": 1
+  },
+  "notes": [
+    "the text layer came from the vision pass over this photograph, not from the file",
+    "two independent reads of the photograph (gemini-3.8-flash-free and nvidia/nemotron-3.5-super-vl-120b-a12b)"
+  ],
+  "how": "Direct probe of the two-reader path (scripts/d0-two-readers.ts) against the committed photograph; the same three readers, the same reconciliation."
+}

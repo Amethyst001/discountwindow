@@ -1,0 +1,83 @@
+{
+  "ranAt": "2026-10-30T00:43:27.785Z",
+  "captureId": "7G077633WE973480T",
+  "capture": {
+    "status": 200,
+    "outcome": {
+      "id": "7G077633WE973480T",
+      "amount": {
+        "currency_code": "USD",
+        "value": "489.76"
+      },
+      "final_capture": true,
+      "seller_protection": {
+        "status": "NOT_ELIGIBLE"
+      },
+      "status": "PENDING",
+      "status_details": {
+        "reason": "UNILATERAL"
+      },
+      "supplementary_data": {
+        "related_ids": {
+          "order_id": "07H42099RL265081V"
+        }
+      },
+      "payee": {
+        "email_address": "sb-s2ofz53612998@personal.example.com",
+        "merchant_id": "P3MJCPDVGZ69Q"
+      },
+      "create_time": "2026-10-29T23:59:52Z",
+      "update_time": "2026-10-29T23:59:52Z",
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v2/payments/captures/7G077633WE973480T",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://api.sandbox.paypal.com/v2/payments/captures/7G077633WE973480T/refund",
+          "rel": "refund",
+          "method": "POST"
+        },
+        {
+          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/07H42099RL265081V",
+          "rel": "up",
+          "method": "GET"
+        }
+      ]
+    },
+    "orderId": "07H42099RL265081V",
+    "payerId": "P3MJCPDVGZ69Q",
+    "payerEmail": "sb-s2ofz53612998@personal.example.com",
+    "amount": {
+      "currency_code": "USD",
+      "value": "489.76"
+    }
+  },
+  "create": {
+    "status": 400,
+    "body": {
+      "error": "invalid_request",
+      "error_description": "No permissions to set target_client_id"
+    },
+    "sent": {
+      "disputed_transactions": [
+        {
+          "buyer_transaction_id": "7G077633WE973480T"
+        }
+      ],
+      "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+      "dispute_amount": {
+        "currency_code": "USD",
+        "value": "489.76"
+      },
+      "extensions": {
+        "merchant_contacted": true,
+        "merchant_contacted_outcome": "NO_RESPONSE",
+        "merchandize_dispute_properties": {
+          "issue_type": "PRODUCT"
+        }
+      }
+    }
+  }
+}

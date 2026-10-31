@@ -1,0 +1,216 @@
+{
+  "generated_at": "2026-10-30",
+  "claim": "The eleven checks are the same in every country; only rules/jurisdictions.yaml changes. This is one document decided under both shipped profiles.",
+  "invoice": {
+    "number": "MT-2207",
+    "face_cents": 240000,
+    "issued_on": "2026-10-15",
+    "due_on": "2026-12-14",
+    "debtor": "Meridian Trading Ltd"
+  },
+  "evidence": {
+    "sha256": "ee8e8f6dd4dcb2dfa024b8c88d4bee66dba3ca6aa6c45134e48c8aec3bcd7d9b",
+    "mime": "text/plain",
+    "bytes": 281
+  },
+  "profiles": {
+    "gb": {
+      "jurisdiction": {
+        "code": "GB",
+        "label": "United Kingdom"
+      },
+      "verdict": "VERIFIED",
+      "checks": [
+        {
+          "id": "E00",
+          "passed": true,
+          "rule": "A PayPal transaction underlies the sale, Purchase Protection is ELIGIBLE for it, and the tracking number is registered against it. Where no PayPal transaction exists the status is recorded as NOT_ON_RAIL and the desk proceeds on the documents and the debtor's history alone, priced one band lower. These programmes cover eligible purchases rather than services, so an ineligibility means the rail declines this transaction — never that the goods behind the invoice are worthless.",
+          "detail": "Sandbox override: PayPal returned UNKNOWN for the sandbox account in use. The check is recorded as overridden, not passed."
+        },
+        {
+          "id": "E01",
+          "passed": true,
+          "rule": "A delivery document exists, decodes, and yields the fields this gate reads.",
+          "detail": "Proof of delivery is present and readable."
+        },
+        {
+          "id": "E02",
+          "passed": true,
+          "rule": "A carrier this desk recognises and a tracking number matching that carrier's published format appear on the proof of delivery. The carrier itself is not queried.",
+          "detail": "Tracking number is well-formed: Royal Mail RB123456789GB. The carrier itself is not queried."
+        },
+        {
+          "id": "E03",
+          "passed": true,
+          "rule": "The document states delivered, and the delivery date falls within 60 days before the invoice date.",
+          "detail": "Delivered 2026-10-05, 10 day(s) before the invoice date."
+        },
+        {
+          "id": "E04",
+          "passed": true,
+          "rule": "The consignee name matches the debtor's legal name after normalisation, or a recorded alias.",
+          "detail": "Consignee \"Meridian Trading Limited\" matches the debtor \"Meridian Trading Ltd\"."
+        },
+        {
+          "id": "E05",
+          "passed": true,
+          "rule": "The delivery address matches the debtor's billing address on street, city and postal code.",
+          "detail": "Delivered to 12 Old Street, London EC1R 1PG, the debtor's billing address under the United Kingdom postal-code rule."
+        },
+        {
+          "id": "E06",
+          "passed": true,
+          "rule": "Neither the document's SHA-256 nor the tracking number it carries has appeared on any other invoice in this book. The hash stops a re-upload of the same file; the tracking number stops one real delivery financing two receivables, which is the cheaper half of the fabricated-paper trick and the only half this desk can see without asking a carrier.",
+          "detail": "Document hash ee8e8f6dd4dcb2df… and tracking number RB123456789GB are both unique to this invoice."
+        },
+        {
+          "id": "E07",
+          "passed": true,
+          "rule": "The invoice number is unique for this debtor and is not attached to a funded or listed invoice.",
+          "detail": "Invoice MT-2207 has not been financed for this debtor."
+        },
+        {
+          "id": "E08",
+          "passed": true,
+          "rule": "The stated total equals the sum of the line items, and the purchase order reference matches when one was supplied.",
+          "detail": "2 line items reconcile to the stated total."
+        },
+        {
+          "id": "E09",
+          "passed": true,
+          "rule": "The issue date is not after the due date, and the tenor is no longer than 120 days.",
+          "detail": "60-day tenor from 2026-10-15 to 2026-12-14."
+        },
+        {
+          "id": "E10",
+          "passed": true,
+          "rule": "The proof of delivery carries a signature or a delivery photograph.",
+          "detail": "Receipt is evidenced by a signature."
+        }
+      ],
+      "refusals": [],
+      "note": "what the seeded book holds; MT-2207 verifies and prices under this profile"
+    },
+    "us": {
+      "jurisdiction": {
+        "code": "US",
+        "label": "United States"
+      },
+      "verdict": "REFUSED",
+      "checks": [
+        {
+          "id": "E00",
+          "passed": true,
+          "rule": "A PayPal transaction underlies the sale, Seller Protection is ELIGIBLE for it, and the tracking number is registered against it. Where no PayPal transaction exists the status is recorded as NOT_ON_RAIL and the desk proceeds on the documents and the debtor's history alone, priced one band lower. These programmes cover eligible purchases rather than services, so an ineligibility means the rail declines this transaction — never that the goods behind the invoice are worthless.",
+          "detail": "Sandbox override: PayPal returned UNKNOWN for the sandbox account in use. The check is recorded as overridden, not passed."
+        },
+        {
+          "id": "E01",
+          "passed": true,
+          "rule": "A delivery document exists, decodes, and yields the fields this gate reads.",
+          "detail": "Proof of delivery is present and readable."
+        },
+        {
+          "id": "E02",
+          "passed": false,
+          "rule": "A carrier this desk recognises and a tracking number matching that carrier's published format appear on the proof of delivery. The carrier itself is not queried.",
+          "detail": "carrier Royal Mail is not one the United States desk can verify"
+        },
+        {
+          "id": "E03",
+          "passed": true,
+          "rule": "The document states delivered, and the delivery date falls within 90 days before the invoice date.",
+          "detail": "Delivered 2026-10-05, 10 day(s) before the invoice date."
+        },
+        {
+          "id": "E04",
+          "passed": true,
+          "rule": "The consignee name matches the debtor's legal name after normalisation, or a recorded alias.",
+          "detail": "Consignee \"Meridian Trading Limited\" matches the debtor \"Meridian Trading Ltd\"."
+        },
+        {
+          "id": "E05",
+          "passed": false,
+          "rule": "The delivery address matches the debtor's billing address on street, city and postal code.",
+          "detail": "Delivered to 12 Old Street, London EC1R 1PG, which is not the billing address on file."
+        },
+        {
+          "id": "E06",
+          "passed": true,
+          "rule": "Neither the document's SHA-256 nor the tracking number it carries has appeared on any other invoice in this book. The hash stops a re-upload of the same file; the tracking number stops one real delivery financing two receivables, which is the cheaper half of the fabricated-paper trick and the only half this desk can see without asking a carrier.",
+          "detail": "Document hash ee8e8f6dd4dcb2df… and tracking number RB123456789GB are both unique to this invoice."
+        },
+        {
+          "id": "E07",
+          "passed": true,
+          "rule": "The invoice number is unique for this debtor and is not attached to a funded or listed invoice.",
+          "detail": "Invoice MT-2207 has not been financed for this debtor."
+        },
+        {
+          "id": "E08",
+          "passed": true,
+          "rule": "The stated total equals the sum of the line items, and the purchase order reference matches when one was supplied.",
+          "detail": "2 line items reconcile to the stated total."
+        },
+        {
+          "id": "E09",
+          "passed": true,
+          "rule": "The issue date is not after the due date, and the tenor is no longer than 90 days.",
+          "detail": "60-day tenor from 2026-10-15 to 2026-12-14."
+        },
+        {
+          "id": "E10",
+          "passed": true,
+          "rule": "The proof of delivery carries a signature or a delivery photograph.",
+          "detail": "Receipt is evidenced by a signature."
+        }
+      ],
+      "refusals": [
+        "TRACKING_INVALID",
+        "ADDRESS_MISMATCH"
+      ],
+      "note": "the identical bundle, the identical document, decided with the United States tables"
+    }
+  },
+  "tenor_variant": {
+    "change": "the same document and the same issue date, matured on 2027-02-12 instead: a 120-day tenor",
+    "gb": {
+      "verdict": "VERIFIED",
+      "refusals": [],
+      "e09": "120-day tenor from 2026-10-15 to 2027-02-12."
+    },
+    "us": {
+      "verdict": "REFUSED",
+      "refusals": [
+        "TRACKING_INVALID",
+        "ADDRESS_MISMATCH",
+        "TERMS_INVALID"
+      ],
+      "e09": "Tenor is 120 days; the United States limit is 90."
+    }
+  },
+  "what_moved": [
+    {
+      "check": "E02",
+      "code": "TRACKING_INVALID",
+      "because": "the United States profile does not carry this carrier or this postcode shape"
+    },
+    {
+      "check": "E05",
+      "code": "ADDRESS_MISMATCH",
+      "because": "the United States profile does not carry this carrier or this postcode shape"
+    }
+  ],
+  "what_did_not_move": [
+    "E00",
+    "E01",
+    "E03",
+    "E04",
+    "E06",
+    "E07",
+    "E08",
+    "E09",
+    "E10"
+  ],
+  "currency_note": "Both profiles settle in US dollars in this build; the profile governs the evidence rules, not the settlement currency."
+}

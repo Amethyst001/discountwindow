@@ -1,0 +1,165 @@
+{
+  "ranAt": "2026-10-29T23:06:38.124Z",
+  "http": 201,
+  "body": {
+    "id": "1TD92077S84307342",
+    "status": "COMPLETED",
+    "payment_source": {
+      "paypal": {
+        "email_address": "sb-s2ofz53612998@personal.example.com",
+        "account_id": "P3MJCPDVGZ69Q",
+        "account_status": "VERIFIED",
+        "name": {
+          "given_name": "John",
+          "surname": "Doe"
+        },
+        "address": {
+          "country_code": "US"
+        }
+      }
+    },
+    "purchase_units": [
+      {
+        "reference_id": "seller",
+        "payments": {
+          "captures": [
+            {
+              "id": "7D0883560J436545Y",
+              "status": "PENDING",
+              "status_details": {
+                "reason": "UNILATERAL"
+              },
+              "amount": {
+                "currency_code": "USD",
+                "value": "0.50"
+              },
+              "final_capture": true,
+              "seller_protection": {
+                "status": "NOT_ELIGIBLE"
+              },
+              "links": [
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/7D0883560J436545Y",
+                  "rel": "self",
+                  "method": "GET"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/7D0883560J436545Y/refund",
+                  "rel": "refund",
+                  "method": "POST"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/checkout/orders/1TD92077S84307342",
+                  "rel": "up",
+                  "method": "GET"
+                }
+              ],
+              "create_time": "2026-10-29T23:06:38Z",
+              "update_time": "2026-10-29T23:06:38Z"
+            }
+          ]
+        }
+      },
+      {
+        "reference_id": "funder-1",
+        "payments": {
+          "captures": [
+            {
+              "id": "3HL15889SJ722022X",
+              "status": "PENDING",
+              "status_details": {
+                "reason": "UNILATERAL"
+              },
+              "amount": {
+                "currency_code": "USD",
+                "value": "0.20"
+              },
+              "final_capture": true,
+              "seller_protection": {
+                "status": "NOT_ELIGIBLE"
+              },
+              "links": [
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/3HL15889SJ722022X",
+                  "rel": "self",
+                  "method": "GET"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/3HL15889SJ722022X/refund",
+                  "rel": "refund",
+                  "method": "POST"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/checkout/orders/1TD92077S84307342",
+                  "rel": "up",
+                  "method": "GET"
+                }
+              ],
+              "create_time": "2026-10-29T23:06:36Z",
+              "update_time": "2026-10-29T23:06:36Z"
+            }
+          ]
+        }
+      },
+      {
+        "reference_id": "funder-2",
+        "payments": {
+          "captures": [
+            {
+              "id": "43M97402UB703411Y",
+              "status": "PENDING",
+              "status_details": {
+                "reason": "UNILATERAL"
+              },
+              "amount": {
+                "currency_code": "USD",
+                "value": "0.30"
+              },
+              "final_capture": true,
+              "seller_protection": {
+                "status": "NOT_ELIGIBLE"
+              },
+              "links": [
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/43M97402UB703411Y",
+                  "rel": "self",
+                  "method": "GET"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/43M97402UB703411Y/refund",
+                  "rel": "refund",
+                  "method": "POST"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/checkout/orders/1TD92077S84307342",
+                  "rel": "up",
+                  "method": "GET"
+                }
+              ],
+              "create_time": "2026-10-29T23:06:37Z",
+              "update_time": "2026-10-29T23:06:37Z"
+            }
+          ]
+        }
+      }
+    ],
+    "payer": {
+      "name": {
+        "given_name": "John",
+        "surname": "Doe"
+      },
+      "email_address": "sb-s2ofz53612998@personal.example.com",
+      "payer_id": "P3MJCPDVGZ69Q",
+      "address": {
+        "country_code": "US"
+      }
+    },
+    "links": [
+      {
+        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/1TD92077S84307342",
+        "rel": "self",
+        "method": "GET"
+      }
+    ]
+  }
+}

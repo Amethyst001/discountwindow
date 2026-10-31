@@ -1,0 +1,124 @@
+{
+  "ranAt": "2026-10-29T23:01:29.240Z",
+  "status": 201,
+  "body": {
+    "id": "571683089G6142836",
+    "status": "COMPLETED",
+    "payment_source": {
+      "paypal": {
+        "email_address": "sb-s2ofz53612998@personal.example.com",
+        "account_id": "P3MJCPDVGZ69Q",
+        "account_status": "VERIFIED",
+        "name": {
+          "given_name": "John",
+          "surname": "Doe"
+        },
+        "address": {
+          "country_code": "US"
+        }
+      }
+    },
+    "purchase_units": [
+      {
+        "reference_id": "seller",
+        "payments": {
+          "captures": [
+            {
+              "id": "8KU97245AM022784H",
+              "status": "PENDING",
+              "status_details": {
+                "reason": "UNILATERAL"
+              },
+              "amount": {
+                "currency_code": "USD",
+                "value": "0.90"
+              },
+              "final_capture": true,
+              "seller_protection": {
+                "status": "NOT_ELIGIBLE"
+              },
+              "links": [
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/8KU97245AM022784H",
+                  "rel": "self",
+                  "method": "GET"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/8KU97245AM022784H/refund",
+                  "rel": "refund",
+                  "method": "POST"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/checkout/orders/571683089G6142836",
+                  "rel": "up",
+                  "method": "GET"
+                }
+              ],
+              "create_time": "2026-10-29T23:01:28Z",
+              "update_time": "2026-10-29T23:01:28Z"
+            }
+          ]
+        }
+      },
+      {
+        "reference_id": "platform",
+        "payments": {
+          "captures": [
+            {
+              "id": "0DJ389603U333234R",
+              "status": "PENDING",
+              "status_details": {
+                "reason": "UNILATERAL"
+              },
+              "amount": {
+                "currency_code": "USD",
+                "value": "0.10"
+              },
+              "final_capture": true,
+              "seller_protection": {
+                "status": "NOT_ELIGIBLE"
+              },
+              "links": [
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/0DJ389603U333234R",
+                  "rel": "self",
+                  "method": "GET"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/payments/captures/0DJ389603U333234R/refund",
+                  "rel": "refund",
+                  "method": "POST"
+                },
+                {
+                  "href": "https://api.sandbox.paypal.com/v2/checkout/orders/571683089G6142836",
+                  "rel": "up",
+                  "method": "GET"
+                }
+              ],
+              "create_time": "2026-10-29T23:01:29Z",
+              "update_time": "2026-10-29T23:01:29Z"
+            }
+          ]
+        }
+      }
+    ],
+    "payer": {
+      "name": {
+        "given_name": "John",
+        "surname": "Doe"
+      },
+      "email_address": "sb-s2ofz53612998@personal.example.com",
+      "payer_id": "P3MJCPDVGZ69Q",
+      "address": {
+        "country_code": "US"
+      }
+    },
+    "links": [
+      {
+        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/571683089G6142836",
+        "rel": "self",
+        "method": "GET"
+      }
+    ]
+  }
+}

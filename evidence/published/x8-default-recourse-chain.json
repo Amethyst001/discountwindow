@@ -1,0 +1,195 @@
+{
+  "generated_at": "2026-10-30",
+  "claim": "A receivable that does not pay has a lifecycle, a term chosen before the outcome, and a ledger that refuses to book a promise as money.",
+  "method": "node scripts/export-default.ts — the real src/store.ts, src/ledger.ts and src/audit.ts against an in-memory book. No PayPal call: this artefact is about the position after the debtor fails to pay, which the book owns entirely. The funding posting it starts from is the one captureFunding makes.",
+  "integrity": {
+    "unbalanced_transactions": [],
+    "audit_chain": {
+      "ok": true,
+      "length": 4,
+      "brokenAt": null,
+      "reason": null
+    }
+  },
+  "invoice": {
+    "number": "NW-1",
+    "face_cents": 65000,
+    "due_on": "2026-11-01",
+    "decided_on": "2026-11-10",
+    "days_past_due": 9,
+    "advance_cents": 49301
+  },
+  "grace_by_profile": {
+    "measured_on": "2026-11-10",
+    "invoice_due_on": "2026-11-04",
+    "days_past_due": 6,
+    "US": {
+      "grace_days": 5,
+      "swept": true,
+      "invoice_status_after": "overdue"
+    },
+    "GB": {
+      "grace_days": 7,
+      "swept": false,
+      "invoice_status_after": "funded"
+    },
+    "note": "One invoice, one date, one set of documents. Six days past due is overdue in the United States and still funded in the United Kingdom, because the grace period is read from the debtor's profile — the same file that sets its tenor cap and its carrier formats."
+  },
+  "recourse_term_priced": {
+    "with_recourse": {
+      "annual_rate_bp": 1400,
+      "advance_cents": 49301
+    },
+    "without_recourse": {
+      "annual_rate_bp": 1800,
+      "advance_cents": 48969
+    },
+    "premium_bp": 400,
+    "band_c_non_recourse": {
+      "ok": false,
+      "reason": "Band C paper is bought with recourse to the seller: the record is too thin for the desk to take the debtor's credit risk in its own name at any rate."
+    }
+  },
+  "recourse_chain": {
+    "swept": {
+      "invoice_status": "overdue",
+      "detail": [
+        {
+          "invoiceId": "inv_1",
+          "invoiceNumber": "NW-1",
+          "daysPastDue": 9,
+          "graceDays": 5
+        }
+      ]
+    },
+    "declared_default": {
+      "invoice_status": "defaulted",
+      "event": {
+        "id": "dflt_df32223d149b4cd085d3",
+        "invoice_id": "inv_1",
+        "mode": "recourse",
+        "face_cents": 65000,
+        "funder_outlay_cents": 49301,
+        "claim_cents": 49301,
+        "status": "claim_open",
+        "days_past_due": 9,
+        "created_at": "2026-10-30T12:14:34.414Z"
+      },
+      "balances": {
+        "funder_outlay": 49301,
+        "funder_yield": 0,
+        "platform_clearing": 0,
+        "seller_advance": -48976
+      }
+    },
+    "note_at_default": "Recourse posts nothing. The seller owes a repurchase and this book will not report a recovery it has not received.",
+    "first_partial": {
+      "applied": {
+        "amountCents": 20000,
+        "shortfallCents": 29301,
+        "status": "claim_open"
+      },
+      "invoice_status": "defaulted",
+      "event": {
+        "id": "dflt_df32223d149b4cd085d3",
+        "invoice_id": "inv_1",
+        "mode": "recourse",
+        "face_cents": 65000,
+        "funder_outlay_cents": 49301,
+        "claim_cents": 29301,
+        "status": "claim_open",
+        "days_past_due": 9,
+        "created_at": "2026-10-30T12:14:34.414Z"
+      },
+      "balances": {
+        "funder_outlay": 29301,
+        "funder_yield": 0,
+        "platform_clearing": 20000,
+        "seller_advance": -48976
+      }
+    },
+    "second_partial": {
+      "applied": {
+        "amountCents": 29301,
+        "shortfallCents": 0,
+        "status": "repurchased"
+      },
+      "invoice_status": "repurchased",
+      "event": {
+        "id": "dflt_df32223d149b4cd085d3",
+        "invoice_id": "inv_1",
+        "mode": "recourse",
+        "face_cents": 65000,
+        "funder_outlay_cents": 49301,
+        "claim_cents": 0,
+        "status": "repurchased",
+        "days_past_due": 9,
+        "created_at": "2026-10-30T12:14:34.414Z"
+      },
+      "balances": {
+        "funder_outlay": 0,
+        "funder_yield": 0,
+        "platform_clearing": 49301,
+        "seller_advance": -48976
+      }
+    },
+    "third_payment": "the claim on this invoice is already repurchased"
+  },
+  "non_recourse_chain": {
+    "declared_default": {
+      "invoice_status": "defaulted",
+      "event": {
+        "id": "dflt_8f1efa23a5b9456b9c0c",
+        "invoice_id": "inv_1",
+        "mode": "non_recourse",
+        "face_cents": 65000,
+        "funder_outlay_cents": 49301,
+        "claim_cents": 0,
+        "status": "written_off",
+        "days_past_due": 9,
+        "created_at": "2026-10-30T12:14:34.433Z"
+      },
+      "balances": {
+        "funder_outlay": 0,
+        "funder_yield": 49301,
+        "platform_clearing": 0,
+        "seller_advance": -48976
+      }
+    },
+    "attempt_to_collect": "a non-recourse position was written off on the day it defaulted; there is no claim to collect",
+    "note": "The outlay is credited and the funder's yield debited on the day of default: this is the desk's own loss, so it is taken immediately."
+  },
+  "claim_written_off_after_partial": {
+    "amount_written_off_cents": 19301,
+    "invoice_status": "defaulted",
+    "event": {
+      "id": "dflt_ca8a2aee02f44d41b9e2",
+      "invoice_id": "inv_1",
+      "mode": "recourse",
+      "face_cents": 65000,
+      "funder_outlay_cents": 49301,
+      "claim_cents": 0,
+      "status": "uncollectible",
+      "days_past_due": 9,
+      "created_at": "2026-10-30T12:14:34.450Z"
+    },
+    "balances": {
+      "funder_outlay": 0,
+      "funder_yield": 19301,
+      "platform_clearing": 30000,
+      "seller_advance": -48976
+    },
+    "note": "Thirty thousand came back first, so only the remaining 19,301 is a loss. A claim is never written off twice."
+  },
+  "statuses_seen": {
+    "overdue": "invoice status after the sweep",
+    "defaulted": "invoice status once the default is declared",
+    "repurchased": "invoice status once the claim is met in full",
+    "events": [
+      "claim_open",
+      "written_off",
+      "repurchased",
+      "uncollectible"
+    ]
+  }
+}

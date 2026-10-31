@@ -1,0 +1,106 @@
+# The evidence gate. Every check here is deterministic. The model fills fields; it never decides.
+# Order matters: E00 runs first because the rail's answer about the underlying sale — including the
+# answer "there is no rail transaction to ask about" — changes how much the desk will pay.
+#
+# Rule sentences carry {placeholders} filled from the jurisdiction profile that decides the invoice
+# (rules/jurisdictions.yaml). The checks themselves are the same in every country; what differs is the
+# carrier table, the postal-code rule, the delivery window, the tenor cap and PayPal's own name for
+# the protection.
+#
+# One rule reaches every check here: a document field read below the profile's minimumConfidence can
+# fail a check but cannot pass one, and the detail names the field, its confidence and the floor it
+# fell under. A weakly read *absence* is not relabelled unreadable — a missing signature line fails as
+# a missing signature line, because that is the piece of evidence the seller can still go and find.
+version: 1
+
+checks:
+  - id: E00
+    title: The rail stands behind this sale
+    rule: >-
+      A PayPal transaction underlies the sale, {protectionProgram} is ELIGIBLE for it, and the tracking
+      number is registered against it. Where no PayPal transaction exists the status is recorded as
+      NOT_ON_RAIL and the desk proceeds on the documents and the debtor's history alone, priced one
+      band lower. These programmes cover eligible purchases rather than services, so an ineligibility
+      means the rail declines this transaction — never that the goods behind the invoice are worthless.
+    reads: [protection.status, protection.trackerId]
+    refusal: PROTECTION_INELIGIBLE
+    terminal: true
+
+  - id: E01
+    title: Proof of delivery is present and readable
+    rule: A delivery document exists, decodes, and yields the fields this gate reads.
+    reads: [pod.present, pod.readable]
+    refusal: POD_MISSING
+    refusalWhenUnreadable: POD_UNREADABLE
+    terminal: true
+
+  - id: E02
+    title: The tracking number is well-formed for a known carrier
+    rule: A carrier this desk recognises and a tracking number matching that carrier's published format appear on the proof of delivery. The carrier itself is not queried.
+    reads: [pod.carrier, pod.trackingNumber]
+    refusal: TRACKING_INVALID
+    terminal: true
+
+  - id: E03
+    title: The parcel was delivered, and recently
+    rule: The document states delivered, and the delivery date falls within {deliveryWindowDays} days before the invoice date.
+    reads: [pod.delivered, pod.deliveredOn, invoice.issuedOn]
+    refusal: NOT_DELIVERED
+    refusalWhenLate: DELIVERY_DATE_OUT_OF_WINDOW
+    terminal: true
+
+  - id: E04
+    title: It was delivered to the debtor
+    rule: The consignee name matches the debtor's legal name after normalisation, or a recorded alias.
+    reads: [pod.consigneeName, debtor.legalName, debtor.aliases]
+    refusal: CONSIGNEE_MISMATCH
+    terminal: true
+
+  - id: E05
+    title: It went to the debtor's address
+    rule: The delivery address matches the debtor's billing address on street, city and postal code.
+    reads: [pod.deliveryAddress, debtor.billingAddress]
+    refusal: ADDRESS_MISMATCH
+    terminal: true
+
+  - id: E06
+    title: This evidence has not been used before
+    rule: >-
+      Neither the document's SHA-256 nor the tracking number it carries has appeared on any other
+      invoice in this book. The hash stops a re-upload of the same file; the tracking number stops
+      one real delivery financing two receivables, which is the cheaper half of the fabricated-paper
+      trick and the only half this desk can see without asking a carrier.
+    reads: [evidence.sha256, pod.trackingNumber]
+    refusal: EVIDENCE_REUSED
+    terminal: true
+
+  - id: E07
+    title: This invoice has not been financed
+    rule: The invoice number is unique for this debtor and is not attached to a funded or listed invoice.
+    reads: [invoice.invoiceNumber, debtor.id]
+    refusal: INVOICE_ALREADY_FINANCED
+    terminal: true
+
+  - id: E08
+    title: The invoice arithmetic holds
+    rule: The stated total equals the sum of the line items, and the purchase order reference matches when one was supplied.
+    reads: [invoice.totalCents, invoice.lineItems, invoice.poRef, pod.poRef]
+    refusal: AMOUNT_MISMATCH
+    terminal: true
+
+  - id: E09
+    title: The terms are coherent
+    rule: The issue date is not after the due date, and the tenor is no longer than {maximumTenorDays} days.
+    reads: [invoice.issuedOn, invoice.dueOn]
+    refusal: TERMS_INVALID
+    terminal: true
+
+  - id: E10
+    title: Someone took receipt
+    rule: The proof of delivery carries a signature or a delivery photograph.
+    reads: [pod.hasSignature, pod.hasPhoto]
+    refusal: NO_SIGNATURE_EVIDENCE
+    terminal: true
+
+# Limits and the carrier table live in jurisdictions.yaml, per country. This file describes what a
+# check means; that file says what a country's numbers are.

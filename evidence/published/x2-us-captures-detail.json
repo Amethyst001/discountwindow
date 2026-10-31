@@ -1,0 +1,85 @@
+{
+  "ranAt": "2026-10-29T23:02:30.225Z",
+  "captures": {
+    "8KU97245AM022784H": {
+      "http": 200,
+      "status": "PENDING",
+      "amount": {
+        "currency_code": "USD",
+        "value": "0.90"
+      },
+      "final": true,
+      "sp": {
+        "status": "NOT_ELIGIBLE"
+      },
+      "srb": null,
+      "order": "571683089G6142836",
+      "payee": {
+        "email_address": "sb-s2ofz53612998@personal.example.com",
+        "merchant_id": "P3MJCPDVGZ69Q"
+      }
+    },
+    "0DJ389603U333234R": {
+      "http": 200,
+      "status": "PENDING",
+      "amount": {
+        "currency_code": "USD",
+        "value": "0.10"
+      },
+      "final": true,
+      "sp": {
+        "status": "NOT_ELIGIBLE"
+      },
+      "srb": null,
+      "order": "571683089G6142836",
+      "payee": {
+        "email_address": "sb-s2ofz53612998@personal.example.com",
+        "merchant_id": "P3MJCPDVGZ69Q"
+      }
+    },
+    "6HE796326B655533X": {
+      "http": 200,
+      "status": "PENDING",
+      "amount": {
+        "currency_code": "USD",
+        "value": "1.00"
+      },
+      "final": true,
+      "sp": {
+        "status": "NOT_ELIGIBLE"
+      },
+      "srb": null,
+      "order": "4MK94760HY727411X",
+      "payee": {
+        "email_address": "sb-s2ofz53612998@personal.example.com",
+        "merchant_id": "P3MJCPDVGZ69Q"
+      }
+    }
+  },
+  "order": {
+    "id": "571683089G6142836",
+    "status": "COMPLETED",
+    "units": [
+      {
+        "ref": "seller",
+        "amt": "0.90",
+        "payee": {
+          "email_address": "dw-funder-01@example.com",
+          "display_data": {
+            "brand_name": "Discount Window"
+          }
+        }
+      },
+      {
+        "ref": "platform",
+        "amt": "0.10",
+        "payee": {
+          "email_address": "dw-funder-02@example.com",
+          "display_data": {
+            "brand_name": "Discount Window"
+          }
+        }
+      }
+    ]
+  }
+}

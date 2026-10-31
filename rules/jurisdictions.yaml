@@ -1,0 +1,105 @@
+# The gate is data, and this file is the proof of it. The eleven checks in checks.yaml are the same
+# in every profile; what changes with the country is the table of carriers, what a postal code looks
+# like, how long a stale delivery may be, how long a tenor may run, and what PayPal calls the
+# protection that stands behind the sale. An invoice is decided under the profile named by its
+# debtor's billing-address country. Money code, price and ledger are not touched by any of it.
+#
+# Carrier patterns are published number formats only. No profile queries a carrier; E02 says so on
+# the page in every jurisdiction.
+#
+# A profile decides the evidence rules. It does not decide the settlement currency: every profile in
+# this build prices, captures and posts in US dollars, because the price table, the ledger accounts
+# and the sandbox merchant accounts on the rail are all single-currency. A second currency is not a
+# label — it is an FX policy in the ledger, and that belongs nowhere in a hackathon build.
+version: 1
+default: US
+
+profiles:
+  US:
+    label: United States
+    countryCode: US
+    protectionProgram: Seller Protection
+    deliveryWindowDays: 90
+    maximumTenorDays: 90
+    # How long past the due date the desk waits before it calls the paper overdue. This is a number
+    # the desk chooses per country, not a law, and the default sweep reads it from here rather than
+    # from code so that the waiting period is on the same card as the tenor it follows.
+    graceDays: 5
+    minimumConfidence: 0.7
+    postalCode:
+      # ZIP+4. Two receipts can disagree about the +4 and still mean one place, so the five-digit
+      # prefix is what has to agree, and a code that is not a ZIP is not an address.
+      pattern: '^\d{5}(-\d{4})?$'
+      normalise: digits
+      significant: 5
+    carriers:
+      - name: UPS
+        match: '\b(ups|united parcel)\b'
+        pattern: '^1Z[0-9A-Z]{16}$'
+      - name: FedEx
+        match: '\b(fedex|federal express|fed ex)\b'
+        pattern: '^(\d{12}|\d{15}|\d{20})$'
+      - name: USPS
+        match: '\b(usps|postal service)\b'
+        pattern: '^((94|93|92|95)\d{18,24}|[A-Z]{2}\d{9}US)$'
+      - name: DHL
+        match: '\bdhl\b'
+        pattern: '^(\d{10}|JD\d{18})$'
+    # Recorded so the diff between the two profiles is honest. The gate does not read these keys and
+    # no check here pretends to enforce them.
+    notModelled:
+      - UCC-1 filings and the PMSI that beats a competing factor to the same receivable
+      - state-level licensing for the purchase of receivables
+      # The desk generates and stores a notice of assignment, hashes it into the chain, and keeps an
+      # append-only register of its own attempts to serve it — each entry carrying the digest of the
+      # bytes that went out. What it does not have is proof from outside the desk. UCC 9-406 turns on
+      # notification that reaches the account debtor in a way it can reasonably act on, and a register
+      # the desk wrote itself cannot supply that.
+      - third-party proof that a notice of assignment reached the debtor, and whether UCC 9-406 is satisfied by the channel the desk recorded
+      # The checks read documents. What a shipment actually weighed is on the carrier's manifest and
+      # the carrier is not queried here, so an empty box mailed to a real address is a fraud question,
+      # not a twelfth check — and answering it against the seller is a court matter, not a ledger verb.
+      - carrier weigh-in or manifest data behind E02, and the action for fraud against a seller who assigns paper for goods that never moved
+
+  GB:
+    label: United Kingdom
+    countryCode: GB
+    protectionProgram: Purchase Protection
+    deliveryWindowDays: 60
+    maximumTenorDays: 120
+    # Seven days rather than five: the profile is a set of desk choices, and this one differs on
+    # purpose so the sweep is demonstrably reading the country and not a constant.
+    graceDays: 7
+    minimumConfidence: 0.7
+    postalCode:
+      # N1 4AB, NW1 6XE, W1A1HQ. Space is decorative; the whole code has to agree because there is no
+      # +4 tail to discard.
+      pattern: '^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$'
+      normalise: alnum
+      significant: 0
+    carriers:
+      # UPS and FedEx keep their global formats here, so they are the same rows as in the US profile.
+      - name: UPS
+        match: '\b(ups|united parcel)\b'
+        pattern: '^1Z[0-9A-Z]{16}$'
+      - name: FedEx
+        match: '\b(fedex|federal express|fed ex)\b'
+        pattern: '^(\d{12}|\d{15}|\d{20})$'
+      - name: 'Royal Mail'
+        match: '\b(royal mail|rm\s?(tracked|signed)|parcelforce)\b'
+        pattern: '^[A-Z]{2}\d{9}(GB|RM)$'
+      - name: DPD
+        match: '\b(dpd|dynamic logistics)\b'
+        pattern: '^\d{14}$'
+      - name: Evri
+        match: '\b(evri|hermes)\b'
+        pattern: '^H0[A-Z0-9]{14}$'
+    notModelled:
+      - VAT registration and a valid VAT number on the invoice
+      - Companies House filing history as the source of a debtor's legal name
+      - the UK Money Lenders / FCA perimeter that a purchase of receivables has to sit outside
+      # A legal assignment of a debt in England and Wales needs express notice in writing to the
+      # debtor (Law of Property Act 1925, s.136). The desk produces that writing and registers the
+      # channel it went by; it cannot, from inside a web page, show that a third party delivered it.
+      - proof of service from outside the desk, and the difference between a legal and an equitable assignment
+      - carrier weigh-in or manifest data behind E02, and the action for fraud against a seller who assigns paper for goods that never moved

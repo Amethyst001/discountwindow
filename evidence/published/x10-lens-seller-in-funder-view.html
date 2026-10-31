@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A-1042 · The Discount Window</title>
+<style>
+:root {
+  --paper: #f4efe4;
+  --paper-2: #ebe4d5;
+  --ink: #191712;
+  --ink-2: #4a453c;
+  --ink-3: #7a7266;
+  --rule: #cfc5b2;
+  --oxblood: #78211f;
+  --olive: #40532a;
+  --gold: #9a6f16;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--rule); }
+a:hover { border-bottom-color: var(--ink); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px 96px; }
+.masthead { border-bottom: 1px solid var(--ink); margin-bottom: 0; }
+.masthead .inner { max-width: 1180px; margin: 0 auto; padding: 20px 28px 16px; display: flex; align-items: baseline; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.wordmark { font-family: var(--serif); font-size: 1.375rem; letter-spacing: -0.01em; border: 0; }
+.wordmark small { font-family: var(--sans); font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); margin-left: 12px; }
+nav.top { display: flex; gap: 22px; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; }
+nav.top a { border: 0; color: var(--ink-2); }
+nav.top a[aria-current="page"] { color: var(--ink); border-bottom: 1px solid var(--ink); }
+.rule-strip { border-bottom: 1px solid var(--rule); }
+h1 { font-family: var(--serif); font-weight: 500; font-size: 2.25rem; line-height: 1.15; letter-spacing: -0.015em; margin: 40px 0 8px; }
+h2 { font-family: var(--serif); font-weight: 500; font-size: 1.25rem; margin: 0 0 12px; letter-spacing: -0.01em; }
+h3 { font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 10px; }
+p.lede { font-size: 1.0625rem; color: var(--ink-2); max-width: 62ch; margin: 0 0 32px; }
+.rule { border: 0; border-top: 1px solid var(--rule); margin: 32px 0; }
+.money, .num, time, code, .hash { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-3); }
+.small { font-size: 0.8125rem; }
+.card { background: #faf7ef; border: 1px solid var(--rule); box-shadow: 3px 3px 0 rgba(25,23,18,0.06); padding: 22px 24px; }
+.grid { display: grid; gap: 24px; }
+.cols-3 { grid-template-columns: minmax(0,1.15fr) minmax(0,1.1fr) minmax(0,0.9fr); }
+.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+@media (max-width: 980px) { .cols-3, .cols-2 { grid-template-columns: minmax(0,1fr); } }
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+th { text-align: left; font-size: 0.6875rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; padding: 0 12px 8px 0; border-bottom: 1px solid var(--ink); }
+td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td.r, th.r { text-align: right; padding-right: 0; }
+td.r + td:not(.r), th.r + th:not(.r), td.num + td, th.num + th { padding-left: 18px; }
+tr.total td { border-top: 1px solid var(--ink); border-bottom: 0; font-weight: 600; padding-top: 14px; }
+.status { font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; white-space: nowrap; }
+.s-refused { color: var(--oxblood); }
+.s-verified, .s-funded, .s-settled, .s-repurchased { color: var(--olive); }
+.s-listed, .s-scored, .s-priced, .s-matured, .s-partially_funded { color: var(--gold); }
+.s-received, .s-extracting { color: var(--ink-3); }
+.s-overdue, .s-disputed, .s-defaulted { color: var(--oxblood); }
+.badge { display: inline-block; border: 1px solid currentColor; padding: 1px 7px; font-size: 0.625rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
+.check { display: grid; grid-template-columns: 26px minmax(0,1fr); gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.check:last-child { border-bottom: 0; }
+.check .mark { font-family: var(--mono); font-size: 0.8125rem; line-height: 1.6; }
+.check .pass .mark, .check.pass .mark { color: var(--olive); }
+.check.fail .mark { color: var(--oxblood); }
+.check .rule-text { color: var(--ink-2); font-size: 0.8125rem; }
+.check .detail { font-size: 0.8125rem; }
+.check.fail .detail { color: var(--oxblood); }
+.refusal { border: 1px solid var(--oxblood); background: #fbf3ef; box-shadow: 4px 4px 0 rgba(120,33,31,0.12); padding: 20px 22px; }
+.refusal h2 { color: var(--oxblood); }
+.code-chip { font-family: var(--mono); font-size: 0.75rem; border: 1px solid var(--oxblood); color: var(--oxblood); padding: 2px 8px; display: inline-block; }
+.doc { border: 1px solid var(--rule); background: #fffdf7; padding: 20px 22px; font-family: var(--mono); font-size: 0.75rem; line-height: 1.9; white-space: pre-wrap; word-break: break-word; }
+.doc mark { background: #f2d9d6; color: var(--oxblood); padding: 0 2px; }
+.doc .hl { background: #e9dfc2; }
+tr.diff td { background: #fbf3ef; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 0.8125rem; }
+.kv dt { color: var(--ink-3); }
+.kv dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.kv dd.em { font-weight: 600; }
+button, .button { font-family: var(--sans); font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; background: var(--ink); color: var(--paper); border: 1px solid var(--ink); padding: 11px 18px; cursor: pointer; box-shadow: 3px 3px 0 rgba(25,23,18,0.18); }
+button:hover, .button:hover { background: #000; }
+button:disabled { background: var(--paper-2); color: var(--ink-3); border-color: var(--rule); box-shadow: none; cursor: not-allowed; }
+button.ghost { background: transparent; color: var(--ink); }
+button.danger { background: var(--oxblood); border-color: var(--oxblood); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.note { border-left: 2px solid var(--gold); padding: 2px 0 2px 14px; font-size: 0.8125rem; color: var(--ink-2); }
+.override { border: 1px dashed var(--gold); background: #fbf6e8; padding: 12px 14px; font-size: 0.8125rem; }
+footer { border-top: 1px solid var(--rule); margin-top: 64px; padding-top: 18px; font-size: 0.75rem; color: var(--ink-3); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.empty { padding: 48px 0; color: var(--ink-3); font-family: var(--serif); font-size: 1.125rem; }
+.role-strip { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--rule); padding: 12px 0; margin-top: 24px; }
+.role-strip a { border: 0; padding: 2px 8px; color: var(--ink-2); }
+.role-strip a.on { background: var(--ink); color: var(--paper); }
+@media (max-width: 640px) {
+  .wrap { padding: 0 18px 64px; }
+  .masthead .inner { padding: 16px 18px 14px; }
+  h1 { font-size: 1.75rem; margin-top: 28px; }
+  nav.top { gap: 14px; font-size: 0.6875rem; }
+  th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4) { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="inner">
+    <a class="wordmark" href="/">The Discount Window<small>Receivables, gated on proof</small></a>
+    <nav class="top">
+      <a href="/" aria-current="page">The Book</a><a href="/submit">Submit</a><a href="/archive">Refusals</a><a href="/ledger">Settlement</a>
+    </nav>
+  </div>
+</header>
+<div class="rule-strip"></div>
+<main class="wrap">
+<div class="role-strip">Signed in as <strong>seller</strong> — Seller. Viewing as <a href="/invoices/inv_a4f5398dceca4704bb10?view=desk">Desk</a><a href="/invoices/inv_a4f5398dceca4704bb10?view=seller">Seller</a><a href="/invoices/inv_a4f5398dceca4704bb10?view=funder" class="on">Funder</a><span>The lens is for reading; the buttons follow the name you signed in with.</span></div><div class="small muted" style="margin-top:24px"><a href="/">The book</a> / A-1042</div><h1>Halcyon Retail Group</h1><p class="lede">Northwind Components LLC invoiced $48,000.00, issued 2026-09-24, due 2026-11-23.
+      Status: <span class="status s-priced">Priced</span>.</p><div class="card" style="margin:0 0 24px;max-width:620px">
+      <h3 style="margin-bottom:10px">Your position as funder</h3>
+      <dl class="kv">
+        <dt>Share of face</dt><dd>100%</dd>
+        <dt>You commit</dt><dd class="em">$36,428.01</dd>
+        <dt class="muted">of which platform fee</dt><dd class="muted">$240.00</dd>
+        <dt>At maturity you receive</dt><dd>$37,286.10</dd>
+        <dt class="muted">principal returned</dt><dd class="muted">$36,428.01</dd>
+        <dt class="muted">yield, after an estimated PayPal fee</dt><dd class="muted">$858.09</dd>
+      </dl>
+      <p class="small muted" style="margin:12px 0 0">No slice committed yet.</p>
+    </div><div class="override" style="margin-bottom:24px"><strong>Sandbox override applied to E00.</strong> PayPal did not return an eligible Seller Protection status for the sandbox account in use. The raw status is shown below, the override is written to the audit chain, and it cannot be enabled outside the sandbox.</div><div class="grid cols-3"><section>
+      <h3>The evidence</h3>
+      <div class="doc">FEDEX PROOF OF DELIVERY
+Tracking number: 770123456789
+Status: DELIVERED
+Delivered on: 2026-09-22 at 14:32
+Consignee: Halcyon Retail Group
+Ship to: 4400 Congress Ave, Austin TX 78701
+Customer PO: PO-88421
+Signed by: R. OKAFOR
+Signature captured on device.
+Reference: INV A-1042</div>
+      
+      <p class="small muted" style="margin-top:10px">SHA-256 <span class="hash">ac49e659e22d4f86c209f0ff75276427…</span></p>
+      <div class="card" style="margin-bottom:18px">
+    <h3 style="margin-bottom:8px">How the document was read</h3>
+    <p class="small" style="margin:0 0 10px">
+      The deterministic label parser read the document. No model pass is recorded for this document, so nothing was inferred.
+    </p>
+    <dl class="kv"><dt class="muted">trackingNumber</dt><dd>97%</dd><dt class="muted">consigneeName</dt><dd>95%</dd><dt class="muted">deliveredOn</dt><dd>93%</dd><dt class="muted">deliveryAddress</dt><dd>91%</dd></dl>
+    
+    
+    <p class="small muted" style="margin:10px 0 0">A field under 70% is treated as unreadable. The gate reads these numbers; the model never sees the verdict.</p>
+  </div>
+    </section><section>
+      <h3>The eleven checks</h3>
+      <div class="card" style="margin-bottom:14px">
+    <h3 style="margin-bottom:8px">Which rules decided this</h3>
+    <p class="small" style="margin:0">The debtor's billing country selects the <strong>United States</strong> profile, and with it:
+      UPS, FedEx, USPS, DHL as the carriers this desk believes, a 5-digit ZIP prefix as the address, a delivery no more than 90 days before the
+      invoice, a tenor no longer than 90 days, and Seller Protection as PayPal's cover.</p>
+    <p class="small muted" style="margin:8px 0 0">Those numbers are configuration, one profile per country; the eleven checks, the score and the price are the
+      same everywhere. A United States debtor's receivable is invoiced and settled in US dollars in this build.</p>
+  </div>
+      
+      <div class="card"><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E00</strong> <span class="detail">Sandbox override: PayPal returned UNKNOWN for the sandbox account in use. The check is recorded as overridden, not passed.</span></div>
+      <div class="rule-text muted">A PayPal transaction underlies the sale, Seller Protection is ELIGIBLE for it, and the tracking number is registered against it. Where no PayPal transaction exists the status is recorded as NOT_ON_RAIL and the desk proceeds on the documents and the debtor&#39;s history alone, priced one band lower. These programmes cover eligible purchases rather than services, so an ineligibility means the rail declines this transaction — never that the goods behind the invoice are worthless.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E01</strong> <span class="detail">Proof of delivery is present and readable.</span></div>
+      <div class="rule-text muted">A delivery document exists, decodes, and yields the fields this gate reads.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E02</strong> <span class="detail">Tracking number is well-formed: FedEx 770123456789. The carrier itself is not queried.</span></div>
+      <div class="rule-text muted">A carrier this desk recognises and a tracking number matching that carrier&#39;s published format appear on the proof of delivery. The carrier itself is not queried.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E03</strong> <span class="detail">Delivered 2026-09-22, 2 day(s) before the invoice date.</span></div>
+      <div class="rule-text muted">The document states delivered, and the delivery date falls within 90 days before the invoice date.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E04</strong> <span class="detail">Consignee &quot;Halcyon Retail Group&quot; matches the debtor &quot;Halcyon Retail Group&quot;.</span></div>
+      <div class="rule-text muted">The consignee name matches the debtor&#39;s legal name after normalisation, or a recorded alias.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E05</strong> <span class="detail">Delivered to 4400 Congress Ave, Austin 78701, the debtor&#39;s billing address under the United States postal-code rule.</span></div>
+      <div class="rule-text muted">The delivery address matches the debtor&#39;s billing address on street, city and postal code.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E06</strong> <span class="detail">Document hash ac49e659e22d4f86… and tracking number 770123456789 are both unique to this invoice.</span></div>
+      <div class="rule-text muted">Neither the document&#39;s SHA-256 nor the tracking number it carries has appeared on any other invoice in this book. The hash stops a re-upload of the same file; the tracking number stops one real delivery financing two receivables, which is the cheaper half of the fabricated-paper trick and the only half this desk can see without asking a carrier.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E07</strong> <span class="detail">Invoice A-1042 has not been financed for this debtor.</span></div>
+      <div class="rule-text muted">The invoice number is unique for this debtor and is not attached to a funded or listed invoice.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E08</strong> <span class="detail">3 line items reconcile to the stated total.</span></div>
+      <div class="rule-text muted">The stated total equals the sum of the line items, and the purchase order reference matches when one was supplied.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E09</strong> <span class="detail">60-day tenor from 2026-09-24 to 2026-11-23.</span></div>
+      <div class="rule-text muted">The issue date is not after the due date, and the tenor is no longer than 90 days.</div>
+    </div>
+  </div><div class="check pass">
+    <div class="mark">✓</div>
+    <div>
+      <div><strong>E10</strong> <span class="detail">Receipt is evidenced by a signature.</span></div>
+      <div class="rule-text muted">The proof of delivery carries a signature or a delivery photograph.</div>
+    </div>
+  </div></div>
+    </section><section>
+      <h3>The arithmetic</h3>
+      <div class="card" style="margin-bottom:18px">
+        <dl class="kv">
+          <dt>Debtor score</dt><dd class="em">78 <span class="muted">band B</span></dd>
+          <dt class="muted">onTime</dt><dd class="muted">27/40</dd><dt class="muted">daysLate</dt><dd class="muted">13/15</dd><dt class="muted">exposure</dt><dd class="muted">12/15</dd><dt class="muted">relationship</dt><dd class="muted">8/10</dd><dt class="muted">disputes</dt><dd class="muted">10/10</dd><dt class="muted">size</dt><dd class="muted">8/10</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <dl class="kv">
+          <dt>Annual rate</dt><dd>14.0%</dd>
+          <dt>Tenor</dt><dd>60 days</dd>
+          <dt>Gross slice</dt><dd>$38,400.00</dd>
+          <dt>Fee reserve</dt><dd>$1,113.90</dd>
+          <dt>Net slice</dt><dd>$37,286.10</dd>
+          <dt>Discount</dt><dd>$858.09</dd>
+          <dt>Advance</dt><dd class="em">$36,428.01</dd>
+          <dt>Platform fee</dt><dd>$240.00</dd>
+        </dl>
+      </div>
+      <p class="note" style="margin-top:18px">Fund is pressed by <strong>desk</strong> or <strong>funder</strong> — not by <strong>seller</strong>. The buttons on this page follow the name you signed in with, not the lens you are reading through.</p>
+      
+      <div class="card" style="margin-top:18px">
+    <h3 style="margin-bottom:10px">Who stands behind this paper</h3>
+    <p class="small" style="margin:0">With recourse. If the debtor does not pay, the seller repurchases the paper at what the funder put in.</p>
+  </div>
+    </section></div><hr class="rule"><h3>Notice of assignment</h3>
+      <p class="small muted">Not issued. The desk tells the debtor where to pay only once the receivable is funded in full; a partly bought invoice has not been assigned cleanly.</p><hr class="rule"><h3>Audit chain</h3>
+      <table><thead><tr><th class="r">Seq</th><th>Event</th><th>Hash</th><th>Previous</th></tr></thead><tbody>
+      <tr><td class="r num">1</td><td>extraction</td>
+        <td class="hash small">189143810aa564154e96e994…</td><td class="hash small muted">000000000000000000000000…</td></tr><tr><td class="r num">2</td><td>gate</td>
+        <td class="hash small">85493a1c2ff08666ea626291…</td><td class="hash small muted">189143810aa564154e96e994…</td></tr><tr><td class="r num">3</td><td>price</td>
+        <td class="hash small">2e0640eaf45663fcc44864a9…</td><td class="hash small muted">85493a1c2ff08666ea626291…</td></tr>
+      </tbody></table>
+<footer>
+  <span>PayPal sandbox. No real money moves. Every payment here was captured against api-m.sandbox.paypal.com.</span>
+  <span class="mono small">Nothing is listed until delivery evidence is verified.</span>
+</footer>
+</main>
+</body>
+</html>

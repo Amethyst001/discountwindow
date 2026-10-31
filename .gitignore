@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+data/
+evidence/d0/
+*.sqlite
+*.sqlite-journal
+*.db
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Scratch: review briefs, generated fixtures, run logs
+temp/
