@@ -11,6 +11,7 @@ import { renderBook, renderDealRoom, renderLedger, renderArchive, renderSubmit, 
 import { verifyChain, appendAudit } from './audit.ts';
 import { verifyWebhookSignature, getOrder, searchTransactions } from './paypal.ts';
 import { normalizeTransactions, reconcileRailHistory } from './rail.ts';
+import { sellerActionFor } from './gate.ts';
 import type { Cents } from './money.ts';
 import type { DebtorHistory } from './score.ts';
 import { extractEvidence } from './extract.ts';
@@ -334,6 +335,19 @@ const server = http.createServer(async (req, res) => {
       if (deny('read the api')) return;
       const detail = invoiceDetail(db, apiDetailMatch[1]);
       if (!detail) return send(res, 404, JSON.stringify({ error: 'not found' }), 'application/json');
+      // The page re-renders the fix sentence from the rule set for refusals recorded before
+      // seller_action existed; the machine surface follows the same rule, so an agent reading an
+      // old refusal gets the same answer a seller does.
+      for (const d of detail.decisions ?? []) {
+        if (d.kind !== 'gate') continue;
+        try {
+          const reasons = JSON.parse(d.reasons_json ?? '[]');
+          if (Array.isArray(reasons)) {
+            for (const r of reasons) r.sellerAction ??= sellerActionFor(r.code);
+            d.reasons_json = JSON.stringify(reasons);
+          }
+        } catch { /* a reason body that does not parse is served as stored */ }
+      }
       return send(res, 200, JSON.stringify(detail, null, 2), 'application/json');
     }
     if (req.method === 'GET' && path === '/api/ledger') {
