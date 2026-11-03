@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { openDb, nowIso } from './db.ts';
-import { intakeInvoice, ensureParty, type CreateInvoiceInput } from './store.ts';
+import { intakeInvoice, ensureParty, nextResubmissionNumber, recordResubmission, type CreateInvoiceInput } from './store.ts';
 import { config, isSandbox } from './config.ts';
 import type { DebtorHistory } from './score.ts';
 
@@ -26,7 +26,10 @@ const rand = mulberry32(20261030);
 
 const sha = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
-const SELLER = { id: 'seller-northwind', name: 'Northwind Components LLC', country: 'US', paypalMerchantId: config.sellerEmail || undefined };
+// The seller the demo is about: a component maker in Aba selling to a Texas buyer. The id is the
+// legacy one the seed has always used, so an existing book still opens; the legal name and country
+// are what a judge reads.
+const SELLER = { id: 'seller-northwind', name: 'Northwind Components Ltd', country: 'NG', paypalMerchantId: config.sellerEmail || undefined };
 
 const DEMO_DEBTOR = {
   id: 'debtor-halcyon',
@@ -162,6 +165,59 @@ const gb = intake({
   history: { ...DEMO_HISTORY, faceCents: 240_000 }
 });
 console.log('MT-2207', gb.status, gb.gate.verdict, gb.gate.jurisdiction?.label, gb.price ? `advance ${gb.price.advanceCents}` : '');
+
+// ---- 1d. The AI's own failure, on the record. This is the measured degraded scan from
+// evidence/published/x11-degraded-read.json: the smudge took three digits off the tracking number,
+// both readers kept the remaining nine at 75%, and E02 refuses a nine-digit FedEx number. The file
+// is the committed JPEG (same SHA-256), not a synthetic stand-in, so the page and the evidence are
+// provably the same document. A judge who wants the AI to change an outcome can read this one.
+const degradedText = [
+  'NORTHWIND FREIGHT - PROOF OF DELIVERY',
+  'Doc type: bill of lading / delivery receipt',
+  'Carrier: FedEx',
+  'Tracking numb    120098780',
+  'Status: DELIVERED',
+  'Delivered on: 2026-10-27 at 14:05',
+  'Consignee: Halcyon Retail Group',
+  'Ship to: 4400 Congress Ave, Austin TX 78701',
+  'Customer PO: PO-88464',
+  'Reference: INV A-1054',
+  'Pieces: 3 Weight: 412 lb',
+  'SIGNED BY (print): R. OKONKO',
+  'Signature: R. Okonko',
+  'Signature captured on device. Retain 90 days.',
+  'RECEIVED',
+  '2026 OCT 27 PM 2:11'
+].join('\n');
+const degraded = intake({
+  seller: SELLER, debtor: DEMO_DEBTOR,
+  invoice: {
+    invoiceNumber: 'A-1054', totalCents: 125_000, issuedOn: '2026-10-28', dueOn: '2027-01-26', poRef: 'PO-88464',
+    lineItems: [{ description: 'Precision bracket, machined', cents: 125_000 }]
+  },
+  pod: {
+    present: true, readable: true, carrier: 'FedEx', trackingNumber: '120098780',
+    delivered: true, deliveredOn: '2026-10-27', consigneeName: 'Halcyon Retail Group',
+    deliveryAddress: { line1: '4400 Congress Ave', city: 'Austin', state: 'TX', postalCode: '78701', countryCode: 'US' },
+    hasSignature: true, hasPhoto: false, poRef: 'PO-88464',
+    confidence: { trackingNumber: 0.75, consigneeName: 1, deliveredOn: 1, deliveryAddress: 1, hasSignature: 1, delivered: 1 }
+  },
+  evidenceSha256: '6d16bba15ad31125b7142cdbf256d463096d59662df4c01da2c90e618a75a5c2',
+  evidenceText: degradedText,
+  evidence: {
+    path: 'evidence/published/x11-degraded-scan.jpg', mime: 'image/jpeg', bytes: 46_703,
+    model: 'gemini-3.8-flash-free + nvidia/nemotron-3.5-super-vl-120b-a12b', modelVersion: 'x11',
+    raw: { file: 'evidence/published/x11-degraded-scan.jpg', source: 'vision', readers: 2 },
+    confidence: { trackingNumber: 0.75, consigneeName: 1, deliveredOn: 1, deliveryAddress: 1, hasSignature: 1, delivered: 1 },
+    notes: [
+      'the text layer came from the vision pass over this photograph, not from the file',
+      'two independent reads of the photograph (gemini-3.8-flash-free and nvidia/nemotron-3.5-super-vl-120b-a12b)',
+      'the smudge removed three tracking digits; both readers kept nine at 0.75, and E02 refuses the length'
+    ]
+  },
+  protection: { status: 'UNKNOWN' }, history: { ...DEMO_HISTORY, faceCents: 125_000 }
+});
+console.log('A-1054', degraded.status, degraded.gate.verdict, degraded.gate.refusals.map((r) => r.code).join(','));
 // ---- 2. The refusal the demo opens on: delivered to the wrong entity.
 const badDoc = podDoc({
   consignee: 'Halcyon Logistics', invoice: 'A-1043', address: '4400 Congress Ave, Austin TX 78701',
@@ -175,6 +231,25 @@ const b = intake({
   protection: { status: 'UNKNOWN', trackerId: '770123456790' }, history: DEMO_HISTORY
 });
 console.log('A-1043', b.status, b.gate.verdict, b.gate.refusals.map((r) => r.code).join(','));
+
+// ---- 2b. The fix, not a rewind: a corrected document comes back as a new receivable that names
+// the refusal. The refused one stays refused and its evidence cannot finance anything; the new one
+// runs the same eleven checks under a revision number and prices. This is the whole loop on one
+// screen for a judge.
+const fixedNumber = nextResubmissionNumber(db, b.invoiceId);
+const fixedDoc = podDoc({
+  consignee: 'Halcyon Retail Group', invoice: fixedNumber, address: '4400 Congress Ave, Austin TX 78701',
+  tracking: '770123456791', carrier: 'FedEx', deliveredOn: '2026-09-22', signature: true, poRef: 'PO-88421'
+});
+const fixed = intake({
+  seller: SELLER, debtor: DEMO_DEBTOR,
+  invoice: { ...INVOICE_A, invoiceNumber: fixedNumber },
+  pod: { ...GOOD_POD, trackingNumber: '770123456791' },
+  evidenceSha256: sha(fixedDoc), evidenceText: fixedDoc,
+  protection: { status: 'UNKNOWN', trackerId: '770123456791' }, history: DEMO_HISTORY
+});
+recordResubmission(db, b.invoiceId, fixed.invoiceId);
+console.log(fixedNumber, fixed.status, fixed.gate.verdict, fixed.price ? `advance ${fixed.price.advanceCents}` : '');
 
 // ---- 3. No proof of delivery at all.
 const noPodText = 'Invoice B-2201. No delivery documentation attached.';

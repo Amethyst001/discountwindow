@@ -2,20 +2,25 @@
 
 **Receivables, gated on proof.**
 
-A $48,000 parts invoice is refused in seconds because the signature block names a different
-company than the debtor. A $4,200 invoice from the same seller passes the same eleven checks and is
-priced from the debtor's own payment history — the advance sitting ready for the funder's click. A
-separate order, on a smaller invoice, has already been funded for real: one PayPal order, one
-capture, two payees paid. Both outcomes — the refusal and the funding — are on the same page, with
-the document, the hash and the reason.
+A $48,000 parts invoice is refused in seconds: the proof of delivery is signed for **Halcyon
+Logistics**, and the debtor is **Halcyon Retail Group**. The seller sends the corrected document back
+as **A-1043-R2** — same face, same purchase order, a new revision number — and it passes the same
+eleven checks and prices at a **$36,428.01** advance. A third invoice, **A-1054**, arrives as a
+photograph; both vision readers return the same nine-digit tracking number, reconciled at 0.75
+confidence, and the deterministic check refuses it outright because a FedEx number is twelve digits.
+**A-1042**, the clean twin of the refused invoice, is priced on the same terms. Funding is exercised in
+PayPal's **sandbox**: one order, one capture call, a capture per payee, with the capture ids in the
+repo. The refusal and the price sit on the same page, with the document, its SHA-256 and the reason.
 
-**Sandbox only.** Every payment in this build ran against `api-m.sandbox.paypal.com`; no real money
-moves. The client refuses to start against any other host — a literal hostname-and-scheme check, not a
-pattern match, so a typo in an env file cannot point the app at production. What that guard fixes is
-*which host the client will speak to*; certificate validation is Node's, not this check's, and it is not
-a defence against a machine in the middle. One network call in the repo's history did not move money at
-all and is worth naming rather than glossing: a Payouts probe that returned HTTP 201 with a `PENDING`
-$1.00 batch (`MMXFLV6EUC89Y`). It is kept as evidence, the API is called nowhere in the product, and the
+**Sandbox only, and synthetic paper.** Every payment in this build ran against
+`api-m.sandbox.paypal.com`; no real money moves. The book of 1,007 receivables is seeded and says so
+on its own front page — the four invoices above are the worked examples, not customers. The client
+refuses to start against any other host — a literal hostname-and-scheme check, not a pattern match, so
+a typo in an env file cannot point the app at production. What that guard fixes is *which host the
+client will speak to*; certificate validation is Node's, not this check's, and it is not a defence
+against a machine in the middle. One network call in the repo's history did not move money at all and
+is worth naming rather than glossing: a Payouts probe that returned HTTP 201 with a `PENDING` $1.00
+batch (`MMXFLV6EUC89Y`). It is kept as evidence, the API is called nowhere in the product, and the
 code path was deleted — see *Why PayPal*.
 
 ---
@@ -28,22 +33,25 @@ documents — and losing on three of them: goods that were never delivered, deli
 is not the debtor, and the same paperwork funded twice. Catching that means opening the documents
 and comparing them against the debtor's record. At volume, nobody does.
 
-PayPal can now reach that seller. Since January 2026, PayPal accounts in Nigeria can receive
-cross-border payments into a linked Paga wallet — the receiving leg that twenty years of
-send-only had kept closed — and the buyer in Texas already pays from a wallet. Both ends of the
-trade are on one rail.
+The cross-border leg is the constraint this build can measure. The seller is Nigerian; PayPal's
+multi-payee orders require the **platform** account to be a US business — a Nigerian business account
+is refused at checkout with `PAYEE_ACCOUNT_LOCKED_OR_CLOSED`, and that measurement is in the README
+with the rest of the sandbox limits. So the demo keeps the seller where the story is and the desk
+where the rail can settle it. Whether a particular Nigerian wallet can receive this seller's leg is a
+question for that seller's own PayPal onboarding; this repository does not assert an answer to it.
 
 The gate underneath is not regional. The same eleven checks read a US freight proof of delivery and
 a GB wholesaler's paperwork, because a jurisdiction is a block of YAML (`rules/jurisdictions.yaml`),
 not a change to the money code.
 
-So the desk does the comparison, and makes the refusal the product. On the seeded book, **625 of 1,005 invoices
-are refused** — 620 of them by the evidence gate, each with a machine-readable reason the seller can
-act on: `POD_MISSING` (211), `ADDRESS_MISMATCH` (148), `CONSIGNEE_MISMATCH` (97), `TRACKING_INVALID` (74),
-`NOT_DELIVERED` (26), `DELIVERY_DATE_OUT_OF_WINDOW` (26) and `NO_SIGNATURE_EVIDENCE` (38). The other five
-pass every check and are then
-refused by the pricing band, which caps the tenor it will buy — a second gate, with its own reason. The
-counts are read from the data by the app; they are not copy.
+So the desk does the comparison, and makes the refusal the product. On the seeded book, **626 of 1,007
+invoices are refused** — 621 of them by the evidence gate, each with a machine-readable reason the
+seller can act on: `POD_MISSING` (211), `ADDRESS_MISMATCH` (148), `CONSIGNEE_MISMATCH` (97),
+`TRACKING_INVALID` (75), `NO_SIGNATURE_EVIDENCE` (38), `NOT_DELIVERED` (26) and
+`DELIVERY_DATE_OUT_OF_WINDOW` (26). The other five pass every check and are then refused by the pricing
+band, which caps the tenor it will buy — a second gate, with its own reason. The refused paper carries
+**$1,713,786 of the book's $2,776,022 face**. The counts are read from the data by the app; they are not
+copy.
 
 ## What it does
 
@@ -59,12 +67,16 @@ counts are read from the data by the app; they are not copy.
 4. **Score and price.** A six-part scorecard on the debtor — on-time rate, days late, exposure,
    relationship, disputes, size — sets the band; the band sets the rate, the LTV and the tenor cap.
    The record behind the scorecard comes from this desk's own history with the debtor, never from a
-   bureau — and with `RAIL_HISTORY=1` it is reconciled against the account's own PayPal transaction
-   history (`GET /v1/reporting/transactions`), so "days late" is the rail's timestamp for when money
-   actually landed, not the paper's claim. The choice is written to the hash-chained audit chain
-   either way; a rail that will not answer falls back to the declared record — recorded, not glossed.
+   bureau — and with `RAIL_HISTORY=1` it is reconciled against PayPal's own records, strongest source
+   first. A maturity capture this desk created is read back from `GET /v2/payments/captures/{id}` and
+   matched to its invoice by `custom_id`, so no amount-and-email guess is involved. Failing that,
+   Transaction Search over the desk's account supplies payments that predate the book; only `S`
+   (settled) rows count, because a `P` row has not landed and cannot make a debtor look on time. The
+   source and the match count are written to the hash-chained audit chain either way; a rail that will
+   not answer falls back to the declared record — recorded, not glossed.
 5. **Fund.** The funder approves one PayPal order whose two purchase units divide the advance — the
-   seller's net and the platform's origination fee. One capture pays both, to two different accounts.
+   seller's net and the platform's origination fee. One capture call settles both units and PayPal
+   returns a capture per payee, so two different accounts are paid by the one approval.
    When that capture is recorded and the paper is owned outright, the desk issues the **notice of
    assignment**: a debtor who was never told can discharge the debt by paying its old seller, so this
    is the step that makes the purchase effective. The notice prints the rail's own status for the
@@ -140,18 +152,19 @@ whose supplier invoices it for goods it took delivery of, where the payment is a
 wallet and the dispute history is already on the rail. That history is the collateral. It is also why
 the demo pair is a components supplier and the retail chain it ships to, rather than a trucking
 company: a goods sale is the case PayPal's protection programme can vouch for, and a carriage bill is
-a service it cannot — the demotion described above, not a hypothetical. The seller gets paid in two
-days instead of the sixty the terms promised; the debtor pays what it owes, once, in the instrument
-it already uses;
-and the desk's fee is priced into the advance rather than held as a balance by the desk. On a rail
-that pays a single merchant account the desk *would* have to redistribute, which is why the claim is
-scoped to this one.
+a service it cannot — the demotion described above, not a hypothetical. The seller is paid when the
+funder's capture clears rather than on the sixty-day promise — in this sandbox the captures stay
+`PENDING` because the test buyer funded by bank, and the pages say so. The debtor pays what it owes,
+once, in the instrument it already uses; and the desk's fee is priced into the advance rather than held
+as a balance by the desk. On a rail that pays a single merchant account the desk *would* have to
+redistribute, which is why the claim is scoped to this one.
 
-## The two money beats, measured
+## The two money beats, measured in the sandbox
 
-Funding, live: order `07H42099RL265081V` reached `COMPLETED` with two captures —
-`7G077633WE973480T` for **$489.76** to the seller and `8XN5263642050782V` for **$3.25** to the
-platform. Both settled `PENDING` because the test buyer funded by bank; the state is recorded.
+Funding, live in the sandbox (no real money): order `07H42099RL265081V` reached `COMPLETED` with two
+captures — `7G077633WE973480T` for **$489.76** to the seller and `8XN5263642050782V` for **$3.25** to
+the platform. Both settled `PENDING` because the test buyer funded by bank; the state is recorded, not
+upgraded.
 
 The shape maturity needs, proven live: an experimental order with **three** purchase units at
 20/30/50 — captures `3HL15889SJ722022X`, `43M97402UB703411Y`, `7D0883560J436545Y` — settled to three
@@ -258,12 +271,17 @@ second photograph of the same receipt, printed with tracking `774120098772` and 
 `evidence/published/x9-scanned-pod-1053.jpg`
 (`evidence/published/x9-two-reader-vision-scanned-pod-1053.json`), the same three readers agreed on
 every field, which is the outcome the design is for: the readers are expected to agree, and the day they
-do not is the day the field drops under the floor and the desk refuses. A deliberately degraded copy of
-the first receipt was read the same way
-([`x11-degraded-read.json`](evidence/published/x11-degraded-read.json)): both readers dropped the three
-tracking digits under the smudge and kept the remaining nine at 0.75, which E02 refuses on length. A
-photograph that makes the two readers split has not been produced here, so the split itself is proven in
-the tests rather than in this evidence — the honest version of a claim that is easy to overstate.
+do not is the day the field drops under the floor and the desk refuses. A deliberately degraded copy of the first receipt was read the same way
+([`x11-degraded-read.json`](evidence/published/x11-degraded-read.json)): both readers returned the same
+nine tracking digits under the smudge — one at 0.50 self-reported confidence, one at 1.00 — and the
+label parser found no tracking value at all, because the label itself was covered. Reconciled, the
+field sits at 0.75: above the 0.70 floor, so it is a value the desk may use, and E02 still refuses it
+because a FedEx number is twelve digits, not nine. That invoice is seeded as **A-1054**; its page
+carries the photograph's SHA-256 (`6d16bba…`), both readers' answers, the parser's silence, and the
+sentence "120098780 is not a well-formed FedEx tracking number". A photograph that makes the two
+readers *split* has not been produced here, so the split itself is proven in the tests rather than in
+this evidence — the honest version of a claim that is easy to overstate. The A-1054 beat is the
+opposite and stronger lesson: the model was allowed to speak, and a deterministic rule overruled it.
 
 **The hostile case the desk cannot read away.** A seller and a debtor in on it together can mail an
 empty tracked envelope to the debtor's real address: a real tracking number, a genuine delivered scan,
@@ -375,16 +393,45 @@ written `USD`. So the cross-border question is answered here as a document quest
 profiles over the same receipt — and not as a currency one. A second currency is an FX policy this
 build does not model, and the column is not a switch.
 
+## The machine surface
+
+The desk is a product for humans, but the objects behind it are readable by a program without
+scraping the HTML. The surface is small and read-only on purpose: an agent can read the book, one deal
+room and the ledger; it cannot move a cent, because a payment still needs a party's own approval in
+PayPal's consent flow.
+
+| Path | Auth | What it returns |
+|---|---|---|
+| `GET /api/status` | none | The same aggregate data as `/status`: chain integrity, counts, ledger totals **by account kind** (never by account code, because codes carry party ids), and webhooks split into verified and unverified. |
+| `GET /api/invoices` | desk | Every invoice with its score, band, price and status; `?status=REFUSED` is the refusal archive as data. |
+| `GET /api/invoices/{id}` | desk | One deal room as an object: the eleven checks, the refusals with their fix sentences, the score, the price, the slices, the audit chain, the extraction. |
+| `GET /api/ledger` | desk | Double-entry rows grouped by transaction, the account totals, and the last twenty webhook deliveries with their signature verdicts. |
+| `POST /webhooks/paypal` | PayPal's signature | The rail's door; its authority is the signature check, never a password. |
+
+The contract is committed, hand-written against `src/server.ts`, and kept deliberately honest: every
+path in [`docs/openapi.yaml`](docs/openapi.yaml) answers on a running server, and every path not in it
+is HTML for a human. [`docs/postman-collection.json`](docs/postman-collection.json) is the same surface
+as a collection you can import and run; neither is generated from a schema the server does not
+enforce. On the webhook door the distinction that matters is written into both: a **definite** bad
+signature is stored as evidence and changes nothing, while a check that **could not be made** is
+answered 503 and stored nowhere, so PayPal's retry is not mistaken for a duplicate. A verified event
+whose processing throws is left unprocessed and answered 503 for the same reason. Unverified rows are
+capped at 200, oldest first, so a flood of junk cannot grow the book without limit.
+
+This is also the honest shape of the AI story: the model's output is an object on the deal room, with
+per-field confidence and both readers' columns, not a private step a judge has to take on trust. An
+agent reads exactly what a human reviewer reads.
+
 ## Built during the submission period
 
 Everything here was written for this event: the gate, the scorecard, the pricing, the PayPal client,
-the ledger, the pages, the dataset generator and the tests. 153 tests, all offline, via `npm test` —
-and one of them boots the real server on a local port and goes through the routes rather than the
-functions under them: 401 for a username that is not one of the four, 401 when a side holding its own
-secret is offered the shared one, 403 when a seller POSTs a fund, and the whole-book register CSV
-arriving for the desk with its header, its reference and its digest still matching the bytes.
-The measured sandbox responses are committed in `evidence/published/`; the raw run logs are
-gitignored.
+the ledger, the pages, the dataset generator, the API contract and the tests. **166 tests, all offline**,
+via `npm test` — and one of them boots the real server on a local port and goes through the routes
+rather than the functions under them: 401 for a username that is not one of the four, 401 when a side
+holding its own secret is offered the shared one, 403 when a seller POSTs a fund, 503 when a fund press
+has no sandbox keys (before any order exists), and the whole-book register CSV arriving for the desk
+with its header, its reference and its digest still matching the bytes. The measured sandbox responses
+are committed in `evidence/published/`; the raw run logs are gitignored.
 
 **What this is not.** Not escrow. Not a lender — the funder's own PayPal account pays the seller
 directly. Not a marketplace with a platform balance. Not a law firm: it produces and keeps the notice
@@ -397,7 +444,7 @@ the evidence source is the reason the product exists.
 | Tool | What it does here | How it is used |
 |---|---|---|
 | PayPal Orders v2 (sandbox) | Moves every cent | An invoice is funded by one order whose purchase units each name their own payee; the funder approves it in PayPal's consent flow and the capture is booked from the order read back afterwards. The three-way maturity split is the same shape with more units. Capture ids in `evidence/published/x5-live-funding.json` and `x2-*`. |
-| PayPal webhooks + `verify-webhook-signature` | Turns a rail event into a desk event | Every delivery is verified against PayPal's transmission before it may change state; an unverified body is stored as evidence and ignored. Dispute, refund and capture events resolve to an invoice and freeze, release or settle it. |
+| PayPal webhooks + `verify-webhook-signature` | Turns a rail event into a desk event | Every delivery is verified against PayPal's transmission before it may change state. A definite failure is stored as evidence and ignored; a check that could not be made is answered 503 and stored nowhere so the retry still runs; a verified event is deduped on its event id and retried if its processing failed. Dispute, refund and capture events resolve to an invoice and freeze, release or settle it. |
 | PayPal Disputes API (sandbox simulate) | Exercises the freeze path without a real buyer | `evidence/published/x4-*.json`. |
 | Payouts API | Deliberately not used | A Payouts call would put the platform in possession of the advance; the probe that measured the endpoint is kept and the code path deleted. |
 | `gemini-3.8-flash-free` (BeatAPI) | Reader A of a photographed document | Returns fields, per-field confidence and a transcription. Never sees the verdict, the score, the price or the payment. |
@@ -405,16 +452,26 @@ the evidence source is the reason the product exists.
 | Deterministic label parser (no model) | Third opinion on the transcription | Regex over the reader's own text; agrees, contradicts, or finds nothing. |
 | Node 24 (`node:http`, `node:sqlite`), `yaml`, `pdfjs-dist` | The whole runtime | Native TypeScript, no framework, no build step, no client-side JavaScript. `pdfjs-dist` exists only to read a PDF's text layer when one is present. |
 
-Nothing from the sponsor list (AG Grid, APIMatic, Astropods, Bryntum, Channel3, Elastic, KERNEL,
-Postman, Zapier, Render) is used, and nothing is bolted on to chase a prize: the ledger is a table on a
-page because that is what the book is, not because a grid sponsor pays for one.
+No sponsor SDK, hosted component or prize-chasing integration is used. The one artifact with a
+sponsor's name on it is `docs/postman-collection.json`, and it is a hand-written JSON file in Postman's
+public collection format, committed so the API can be exercised without a client; Postman itself is
+not a dependency of the build and no Postman workspace is part of the demo. AG Grid is not used — the
+book is three HTML tables. The same rule covers the rest of the sponsor list: nothing is bolted on to
+chase a prize.
 
 ## Try it
 
 - **Repo:** see the submission's repository link. MIT licence in the About section.
 - **Run it:** `npm ci && npm run seed && npm start` — never touches the network unless a sandbox key
-  is present. This is the functional demo the rules ask for: the seeded book, the gate, the funding
-  button and the register all work offline from one command.
+  is present. This is the functional demo the rules ask for: the seeded book, the gate, the provenance
+  chain, the API and the register all work offline from one command. Port 3000 unless `PORT` says
+  otherwise.
+- **Start here:** `/` carries a five-link strip in the order the product decides them — `A-1043`
+  (refused), `A-1043-R2` (the corrected document, priced), `A-1054` (the photograph the model read
+  short, refused), `A-1042` (the clean twin, priced) and `NW-2277` (the small invoice the funding
+  button is for).
+  `/status` proves the book with no login: chain integrity, counts, ledger and webhook verdicts.
+  `/api/status` is the same data as JSON; `docs/openapi.yaml` is the contract.
 - **Demo:** the instance asks for a username and a password. The four usernames are the identities in
   the trade — `desk`, `seller`, `funder`, `debtor`; any other name is refused. Each may read the desk
   from all three sides, because the view is a lens and a lens is for reading; the buttons follow the
@@ -422,4 +479,6 @@ page because that is what the book is, not because a grid sponsor pays for one.
   that answers 403. A side can also be given its own password, which stops it accepting the shared one
   and takes the role out of the hands of whoever is typing. Judges get the shared password — reading
   every side is the point of a demo; pressing the loss side is not, and is not what is shown.
-- **Video:** under three minutes, no music, no third-party marks, recorded on this build at 1440 px.
+- **Video:** the script and shot list are in [`VIDEO.md`](VIDEO.md) — under three minutes, no music,
+  no third-party marks, recorded from this build at 1440 px. Nothing in it is re-enacted: every page
+  it shows exists in the book.

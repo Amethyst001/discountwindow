@@ -6,8 +6,9 @@
 # path NOT here is HTML for a human, not an API.
 #
 # Authority model: the JSON surface belongs to the desk (basic auth, username `desk`). PayPal
-# webhook deliveries carry no basic auth; their authority is the signature check inside the handler,
-# which stores unverified events and acts on none of them.
+# webhook deliveries carry no basic auth; their authority is the signature check inside the handler.
+# A definite signature failure is stored as evidence and acts on nothing; a check that could not be
+# made is answered 503 and stored nowhere, so PayPal's retry is not mistaken for a duplicate.
 openapi: 3.1.0
 info:
   title: The Discount Window
@@ -20,12 +21,6 @@ info:
 servers:
   - url: http://localhost:3000
     description: Local development (no password configured; the session is the desk)
-components:
-  securitySchemes:
-    basicDemo:
-      type: http
-      scheme: basic
-      description: 'Username is the role: desk | seller | funder | debtor. With DEMO_PASSWORD set, the shared password admits all four; a per-side secret (DEMO_PASSWORD_DESK) replaces it for that role.'
 security:
   - basicDemo: []
 paths:
@@ -171,10 +166,21 @@ paths:
       summary: PayPal webhook deliveries
       description: |
         Open to PayPal's delivery infrastructure without basic auth; the authority is PayPal's own
-        signature check, which the handler runs before anything else. An event whose signature does
-        not verify is stored as evidence with verified=0 and acts on nothing. A replay — the same
-        event id delivered twice — is answered 'duplicate' without a second row. Only
-        CUSTOMER.DISPUTE.CREATED, PAYMENT.CAPTURE.REFUNDED, PAYMENT.CAPTURE.REVERSED,
+        signature check, which the handler runs before anything else. Four outcomes, and the
+        difference between them is the point:
+
+        - the signature verifies and the event is new: processed, 200 `ok`;
+        - the signature verifies, the event id was already processed: 200 `duplicate`, no second effect;
+        - the signature verifies, processing throws: 503, the row stays unprocessed, and PayPal's
+          retry runs it again;
+        - the signature is a **definite** failure: the body is stored with verified=0 as evidence,
+          200 `unverified, stored`, and it acts on nothing.
+
+        A body whose signature **could not be checked** (no webhook id, network down, PayPal 5xx) is
+        answered 503 and stored nowhere — otherwise the retry would look like a duplicate and the
+        event would be lost. Unverified rows are capped at 200, oldest first.
+
+        Only CUSTOMER.DISPUTE.CREATED, PAYMENT.CAPTURE.REFUNDED, PAYMENT.CAPTURE.REVERSED,
         CUSTOMER.DISPUTE.RESOLVED and PAYMENT.CAPTURE.COMPLETED can change a position.
       security: []
       requestBody:
@@ -189,13 +195,23 @@ paths:
                 resource: { type: object }
       responses:
         '200':
-          description: 'ok (verified and processed) | unverified, stored (kept as evidence, no action) | duplicate (replay).'
+          description: 'ok (verified and processed) | duplicate (verified replay) | unverified, stored (definite signature failure, no action).'
         '400':
-          description: Body was not JSON.
+          description: Body was not JSON, or it carried no event id.
+          content:
+            text/plain:
+              schema: { type: string }
+        '503':
+          description: The signature could not be checked, or a verified event failed to process. Nothing was stored, or the row was left unprocessed; PayPal should retry.
           content:
             text/plain:
               schema: { type: string }
 components:
+  securitySchemes:
+    basicDemo:
+      type: http
+      scheme: basic
+      description: 'Username is the role: desk | seller | funder | debtor. With DEMO_PASSWORD set, the shared password admits all four; a per-side secret (DEMO_PASSWORD_DESK) replaces it for that role.'
   responses:
     Unauthorized:
       description: No (or bad) credentials. Use one of the four demo usernames.
@@ -214,6 +230,7 @@ components:
       properties:
         sandbox: { type: boolean }
         generatedAt: { type: string, format: date-time }
+        timesAre: { type: string, description: 'Always UTC.' }
         auditChain:
           type: object
           properties:
@@ -228,17 +245,32 @@ components:
             refused: { type: integer }
             verified: { type: integer }
             funded: { type: integer }
-        ledgerTotals:
+        ledgerByKind:
           type: array
-          items: { type: object }
-        webhooksByType:
-          type: array
+          description: Totals by account kind, never by account code — party ids live in the codes.
           items:
             type: object
             properties:
-              type: { type: string }
-              n: { type: integer }
-              verified: { type: integer }
+              kind: { type: string }
+              debits: { type: integer }
+              credits: { type: integer }
+              balance: { type: integer }
+              accounts: { type: integer }
+        webhooks:
+          type: object
+          properties:
+            total: { type: integer }
+            verified: { type: integer }
+            unverified: { type: integer }
+            byType:
+              type: array
+              items:
+                type: object
+                properties:
+                  type: { type: string }
+                  n: { type: integer }
+                  verified: { type: integer }
+                  unverified: { type: integer }
         lastWebhookAt: { type: [string, 'null'], format: date-time }
     InvoiceRow:
       type: object

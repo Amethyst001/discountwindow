@@ -6,6 +6,7 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "invoiceId", "value": "inv_A1054", "description": "Any id from 'The book'. The seeded ids contain the hash of the seed, so copy a live one; the four worked examples are A-1042, A-1043, A-1043-R2 and A-1054, with A-1043 and A-1054 refused." },
     { "key": "deskAuth", "value": "ZGVzazp0aGVzaGFyZWRwYXNzd29yZA==", "description": "Basic auth for desk:thesharedpassword — replace with the deployed demo's password. On localhost with no password configured, the desk needs no header at all." }
   ],
   "item": [
@@ -39,8 +40,8 @@
       "request": {
         "auth": { "type": "basic", "basic": [{ "key": "username", "value": "desk" }, { "key": "password", "value": "thesharedpassword" }] },
         "method": "GET",
-        "url": "{{baseUrl}}/api/invoices/inv_A1051",
-        "description": "Replace the id with one from The book. Returns the eleven checks, the score, the price, the slices, the audit chain and the extraction — the whole deal room as an object."
+        "url": "{{baseUrl}}/api/invoices/{{invoiceId}}",
+        "description": "Copy an id from 'The book'. Returns the eleven checks, the score, the price, the slices, the audit chain and the extraction — the whole deal room as an object. Refusals serve the same fix sentence a seller sees."
       }
     },
     {
@@ -60,9 +61,9 @@
         "url": "{{baseUrl}}/webhooks/paypal",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"id\": \"WH-FORGED-1\",\n  \"event_type\": \"PAYMENT.CAPTURE.REFUNDED\",\n  \"resource\": { \"id\": \"CAP-FORGED\", \"custom_id\": \"inv_A1051\", \"reason\": \"not from PayPal\" }\n}"
+          "raw": "{\n  \"id\": \"WH-FORGED-1\",\n  \"event_type\": \"PAYMENT.CAPTURE.REFUNDED\",\n  \"resource\": { \"id\": \"CAP-FORGED\", \"custom_id\": \"{{invoiceId}}\", \"reason\": \"not from PayPal\" }\n}"
         },
-        "description": "No basic auth on this route — its authority is PayPal's signature check. This forged event is stored with verified=0 and changes nothing: the answer is 'unverified, stored'. Send it twice: the replay is answered 'duplicate'."
+        "description": "No basic auth on this route — its authority is PayPal's signature check. Without a configured webhook id the check cannot run, so the honest answer is 503 'signature verification unavailable; retry' and nothing is stored. With a webhook id configured and PayPal answering that the signature is bad, the answer is 200 'unverified, stored' and it changes nothing."
       }
     }
   ]

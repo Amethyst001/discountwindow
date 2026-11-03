@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb, nowIso } from '../src/db.ts';
 import { resolveWebhookInvoice, freezeForDispute, releaseFreeze } from '../src/store.ts';
+import { handleWebhook } from '../src/webhook.ts';
 
 // A minimal book: one invoice, one slice, one commitment, one maturity order.
 function fixture() {
@@ -143,4 +144,65 @@ test('a refund that froze the position directly also blocks a later release', ()
   const released = releaseFreeze(db, 'inv_1', { eventId: 'WH-2' });
   assert.equal(released.heldForClawback, true);
   assert.equal((db.prepare('SELECT status FROM invoices WHERE id = ?').get('inv_1') as any).status, 'disputed');
+});
+
+// ---- The intake rules, tested without a network ------------------------------------------------
+
+const dispute = (id: string) => ({
+  id,
+  event_type: 'CUSTOMER.DISPUTE.CREATED',
+  resource: { custom_id: 'inv_1', reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED' }
+});
+
+test('a body with no event id is refused, not stored', () => {
+  const db = fixture();
+  const out = handleWebhook(db, { event: { event_type: 'CUSTOMER.DISPUTE.CREATED' }, raw: '{}', verification: { kind: 'verified' } });
+  assert.equal(out.status, 400);
+  assert.equal(Number((db.prepare('SELECT COUNT(*) AS n FROM webhook_events').get() as any).n), 0);
+});
+
+test('a verification that could not be made answers 503 and stores nothing, so the retry is not a duplicate', () => {
+  const db = fixture();
+  const out = handleWebhook(db, { event: dispute('WH-1'), raw: '{}', verification: { kind: 'error', message: 'network down' } });
+  assert.equal(out.status, 503);
+  assert.equal(Number((db.prepare('SELECT COUNT(*) AS n FROM webhook_events').get() as any).n), 0);
+
+  // PayPal resends the same id; this time the check answers, and the freeze happens.
+  const retry = handleWebhook(db, { event: dispute('WH-1'), raw: '{}', verification: { kind: 'verified' } });
+  assert.equal(retry.status, 200);
+  assert.equal((db.prepare('SELECT status FROM invoices WHERE id = ?').get('inv_1') as any).status, 'disputed');
+});
+
+test('a definite signature failure is stored as evidence, and a later verified delivery of the same id still runs', () => {
+  const db = fixture();
+  const failed = handleWebhook(db, { event: dispute('WH-2'), raw: '{}', verification: { kind: 'failed' } });
+  assert.equal(failed.status, 200);
+  const row = db.prepare('SELECT verified, processed_at FROM webhook_events WHERE event_id = ?').get('WH-2') as any;
+  assert.equal(row.verified, 0);
+  assert.equal(row.processed_at, null);
+
+  const verified = handleWebhook(db, { event: dispute('WH-2'), raw: '{}', verification: { kind: 'verified' } });
+  assert.equal(verified.status, 200);
+  const after = db.prepare('SELECT verified, processed_at FROM webhook_events WHERE event_id = ?').get('WH-2') as any;
+  assert.equal(after.verified, 1);
+  assert.ok(after.processed_at);
+  assert.equal((db.prepare('SELECT status FROM invoices WHERE id = ?').get('inv_1') as any).status, 'disputed');
+});
+
+test('a verified event that already processed is a duplicate and does not freeze twice', () => {
+  const db = fixture();
+  handleWebhook(db, { event: dispute('WH-3'), raw: '{}', verification: { kind: 'verified' } });
+  handleWebhook(db, { event: dispute('WH-3'), raw: '{}', verification: { kind: 'verified' } });
+  assert.equal(Number((db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE kind = 'dispute_freeze'").get() as any).n), 1);
+});
+
+test('unverified rows are capped, oldest first', () => {
+  const db = fixture();
+  for (let i = 0; i < 205; i++) {
+    handleWebhook(db, { event: dispute(`JUNK-${i}`), raw: '{}', verification: { kind: 'failed' } });
+  }
+  const n = Number((db.prepare('SELECT COUNT(*) AS n FROM webhook_events').get() as any).n);
+  assert.equal(n, 200);
+  const oldest = db.prepare('SELECT event_id FROM webhook_events ORDER BY received_at, rowid LIMIT 1').get() as any;
+  assert.notEqual(oldest.event_id, 'JUNK-0', 'the oldest junk row was evicted');
 });

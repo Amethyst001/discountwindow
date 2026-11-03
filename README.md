@@ -21,19 +21,25 @@ is not the debtor, and the same paperwork funded twice. All three are visible in
 before a dollar is advanced — if someone actually opens the documents and compares them against the
 debtor record. At volume nobody does.
 
-PayPal can now reach that seller: since January 2026, PayPal accounts in Nigeria can receive
-cross-border payments into a linked Paga wallet. The gate underneath is not regional — the same
-eleven checks read a US freight proof of delivery and a GB wholesaler's paperwork, because a
-jurisdiction is a block of YAML, not a change to the money code.
+The cross-border leg is the constraint this build can measure. The seller is Nigerian; PayPal's
+multi-payee orders require the platform account to be a US business — a Nigerian business account is
+refused at checkout with `PAYEE_ACCOUNT_LOCKED_OR_CLOSED`, and that measurement is below with the rest
+of the sandbox limits. The demo keeps the seller where the story is and the desk where the rail can
+settle it; whether a particular Nigerian wallet can receive this seller's leg is a question for that
+seller's own PayPal onboarding, not something this repository asserts. The gate underneath is not
+regional — the same eleven checks read a US freight proof of delivery and a GB wholesaler's paperwork,
+because a jurisdiction is a block of YAML, not a change to the money code.
 
 This desk does that comparison as a gate. Refusals are the product — and not a dead end: every
 refusal carries the sentence that says what the seller can do about it, and a corrected document
 comes back as a resubmission that names the refusal it answers. The scorecard behind the price reads
 this desk's own record with the debtor, never a bureau — and with `RAIL_HISTORY=1` it is reconciled
-against the account's own PayPal transaction history, so "days late" is the rail's timestamp for
-when money actually landed; the choice is written to the audit chain either way.
+against the desk's own PayPal records, strongest source first: maturity captures read back from
+`GET /v2/payments/captures/{id}` and matched by `custom_id`, then Transaction Search for payments that
+predate the book, where only `S` (settled) rows count because a `P` row has not landed. The source and
+the match count are written to the audit chain either way.
 
-The refusal counts below are the gate at work: 625 of the 1,005 invoices the seed
+The refusal counts below are the gate at work: 626 of the 1,007 invoices the seed
 produces today are refused, each with a machine-readable reason (`POD_MISSING`,
 `CONSIGNEE_MISMATCH`, `DELIVERY_DATE_OUT_OF_WINDOW`, `EVIDENCE_REUSED`, …) that the seller can act
 on. The counts name what the seeded book actually tripped; `EVIDENCE_REUSED` — the same document
@@ -47,9 +53,9 @@ counts are read from the data by the app, never hard-coded in the page.
    is one of them, and no omnibus balance is ever created.
 2. **Maturity.** The debtor pays the face value in one order, again split by ownership: the funder's
    gross slice (advance + yield + the fee reserve priced into it) and the seller's remainder. One
-   capture settles both. PayPal withholds its receiving fee from each payee instead of taking a unit
-   of its own, so that fee is booked from the priced schedule and shown as an estimate — the sandbox
-   capture response does not return it.
+   capture call settles both units, returning a capture per payee. PayPal withholds its receiving fee
+   from each payee instead of taking a unit of its own, so that fee is booked from the priced schedule
+   and shown as an estimate — the sandbox capture response does not return it.
 
 Every unit carries `custom_id` = the invoice id, which is how an inbound webhook names its invoice
 without guessing.
@@ -194,6 +200,26 @@ contra-revenue line. Properties enforced by the schema and the tests, not by con
 - each transaction must **balance**, asserted per posting in SQL;
 - the audit log is **hash-chained** — `/health` re-walks the chain and reports a break.
 
+## The machine surface
+
+The pages are for a human; the same objects are served as JSON for an agent. It is read-only on
+purpose — a payment still needs a party's approval in PayPal's consent flow, so no token can move
+money.
+
+| Path | Auth | Returns |
+|---|---|---|
+| `/api/status` | none | the aggregate vitals, exactly what `/status` renders: chain integrity, counts, ledger totals by account **kind**, webhooks split verified/unverified |
+| `/api/invoices` | desk | every invoice with score, band, price and status; `?status=REFUSED` is the archive as data |
+| `/api/invoices/{id}` | desk | one deal room: checks, fix sentences, score, price, slices, audit chain, extraction |
+| `/api/ledger` | desk | postings by transaction, account totals, the last twenty webhook verdicts |
+| `POST /webhooks/paypal` | PayPal's signature | the rail's door |
+
+[`docs/openapi.yaml`](docs/openapi.yaml) is the hand-written contract (OpenAPI 3.1) and
+[`docs/postman-collection.json`](docs/postman-collection.json) is the same surface as an importable
+collection. Both are checked against `src/server.ts` rather than generated from it. The JSON surface is
+desk-only because a deal room carries the desk's notebook — the service register and raw extractions —
+and the lens that hides those on a page is a render decision, not a data one.
+
 ## The notice of assignment
 
 A receivable the debtor was never told about is a receivable the debtor can discharge by paying its
@@ -285,9 +311,20 @@ invoice on the same date.
 ## Webhooks
 
 `POST /webhooks/paypal` verifies every delivery with
-`/v1/notifications/verify-webhook-signature` before it may change anything. An unverified body is
-stored as evidence and ignored — the settlement page shows both kinds side by side, so the contrast
-is visible rather than asserted.
+`/v1/notifications/verify-webhook-signature` before it may change anything. The four answers are
+deliberately different:
+
+| What happened | Answer | What the book does |
+|---|---|---|
+| signature verifies, event is new | `200 ok` | resolves and processes it |
+| signature verifies, event id already processed | `200 duplicate` | nothing; the second delivery has no second effect |
+| signature verifies, processing throws | `503` | leaves the row unprocessed, so the retry runs it again |
+| signature is a **definite** failure | `200 unverified, stored` | keeps the body as evidence, `verified=0`, acts on nothing |
+| signature **could not be checked** (no id, network, PayPal 5xx) | `503` | stores nothing, so the retry is not mistaken for a duplicate |
+
+Unverified rows are capped at 200, oldest first, so a flood of junk cannot grow the book without
+limit. The settlement page and `/status` show verified and unverified deliveries side by side, so the
+contrast is visible rather than asserted.
 
 A verified event is resolved to an invoice by, in order: `resource.custom_id`, the order id in
 `supplementary_data.related_ids`, any `/orders/{id}` or `/captures/{id}` link, or the capture ids in
@@ -309,15 +346,16 @@ npm ci
 cp .env.example .env      # fill the PayPal sandbox credentials
 npm start                 # http://localhost:3000 — an empty database seeds itself
 npm run seed -- --reset   # rebuild the book from scratch
-npm test                  # 153 tests
+npm test                  # 166 tests
 ```
 
-The seed is deterministic: 1,000 synthetic invoices plus the pinned demo set, and 625 of the 1,005 are
-refused — 620 by the evidence gate, by first reason (211 `POD_MISSING`, 148 `ADDRESS_MISMATCH`, 97
-`CONSIGNEE_MISMATCH`, 74 `TRACKING_INVALID`, 26 `NOT_DELIVERED`, 26 `DELIVERY_DATE_OUT_OF_WINDOW`,
-38 `NO_SIGNATURE_EVIDENCE`), and 5 by the pricing band, which caps the tenor it will buy. First start
-against an empty database runs it automatically so a fresh clone or container shows a working desk;
-set `DW_NO_AUTOSEED=1` to start empty on purpose.
+The seed is deterministic: 1,000 synthetic invoices plus the pinned demo set, and **626 of the 1,007**
+are refused — 621 by the evidence gate, by first reason (211 `POD_MISSING`, 148 `ADDRESS_MISMATCH`, 97
+`CONSIGNEE_MISMATCH`, 75 `TRACKING_INVALID`, 38 `NO_SIGNATURE_EVIDENCE`, 26 `NOT_DELIVERED`, 26
+`DELIVERY_DATE_OUT_OF_WINDOW`), and 5 by the pricing band, which caps the tenor it will buy. The refused
+paper carries $1,713,786 of the book's $2,776,022 face. First start against an empty database runs the
+seed automatically so a fresh clone or container shows a working desk; set `DW_NO_AUTOSEED=1` to start
+empty on purpose.
 
 The server **refuses to start against anything but `api-m.sandbox.paypal.com`** — a literal host
 check in [`src/config.ts`](src/config.ts), not a pattern match, so an env typo cannot reach production.
@@ -429,9 +467,10 @@ app an HTTPS URL will do; a Cloudflare quick tunnel is enough for sandbox webhoo
 src/        server, router, HTML, gate, price, score, ledger, audit, PayPal client, seed
 rules/      checks.yaml — the eleven checks; jurisdictions.yaml — the per-country numbers they read
 scripts/    sandbox experiments (orders, multi-payee, webhooks, dispute attempt, approvals) and fixtures
-tests/      153 tests: money, gate, price, ledger balance, settlement split, webhook attribution, rail reconciliation,
-            reader reconciliation, jurisdiction portability, default & recourse lifecycle,
-            assignment notice integrity, sandbox host guard
+tests/      166 tests: money, gate, price, ledger balance, settlement split, webhook attribution and
+            retry rules, rail reconciliation, capture-first history, reader reconciliation,
+            jurisdiction portability, default & recourse lifecycle, assignment notice integrity,
+            offline funding preflight, sandbox host guard
 evidence/   curated raw sandbox responses (evidence/published/); every measurement in this file can be re-read
 ```
 

@@ -110,7 +110,7 @@ export function renderBook(
     const refused = mine.filter((r) => r.status === 'REFUSED').length;
     const atFunders = mine.filter((r) => HELD_STATUSES.has(r.status)).length;
     const settled = mine.filter((r) => r.status === 'settled').length;
-    heading = 'Northwind Components';
+    heading = mine[0]?.seller_name ?? 'Your receivables';
     lede = 'Your receivables on this desk. The advance is what reaches you now; the rest follows when the debtor pays.';
     cards = `<div class="grid cols-3" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 36px;">
       <div class="card"><h3>Submitted</h3><div class="num" style="font-size:1.75rem">${mine.length.toLocaleString('en-US')}</div></div>
@@ -140,10 +140,34 @@ export function renderBook(
     bodyRows = rows.map((r) => `<tr>${cell(r, `<td>${esc(r.debtor_name)}</td><td class="muted">${esc(r.seller_name)}</td>${money(r.face_cents)}${tenorCell(r)}${scoreCell(r)}${money(r.discount_cents)}${statusCell(r)}`)}</tr>`);
   }
 
+  const startHere = (() => {
+    if (view !== 'desk') return '';
+    const byNumber = new Map(rows.map((r) => [String(r.invoice_number), r]));
+    const wanted = [
+      ['A-1043', 'Refused: the POD names Halcyon Logistics, not the debtor'],
+      ['A-1043-R2', 'The corrected document: same paper, priced'],
+      ['A-1054', 'A photograph the model read short: E02 refuses the tracking number'],
+      ['A-1042', 'The clean version: same face, same PO, priced'],
+      ['NW-2277', 'The small invoice the sandbox funds end to end']
+    ];
+    const links = wanted.filter(([n]) => byNumber.has(n));
+    if (links.length === 0) return '';
+    return `<div class="card" style="margin-bottom:24px;border-left:4px solid var(--gold)">
+      <h3 style="margin:0 0 6px">Start here — the worked examples</h3>
+      <p class="small muted" style="margin:0 0 12px">Five invoices out of ${counts.total.toLocaleString('en-US')}, in the order the product decides them. Each opens the document, the eleven checks and the reason.</p>
+      <ol style="margin:0;padding-left:20px;line-height:1.8">
+        ${links.map(([n, why]) => `<li><a href="/invoices/${esc(byNumber.get(n)!.id)}?view=desk"><span class="mono">${esc(n)}</span></a> — ${esc(why)}</li>`).join('')}
+      </ol>
+      <p class="small muted" style="margin:12px 0 0">Status page: <a href="/status">the audit chain, the book's counts and the ledger, with no login</a>.</p>
+    </div>`;
+  })();
+
   const body = join([
     roleStrip('/', view, identity),
     `<h1>${esc(heading)}</h1>`,
     `<p class="lede">${esc(lede)}</p>`,
+    `<p class="note" style="margin:-12px 0 18px">A synthetic seeded book of ${counts.total.toLocaleString('en-US')} receivables. ${counts.refused.toLocaleString('en-US')} are refused; every count on this page is read from the data, not typed into the copy.</p>`,
+    startHere,
     cards,
     `<table><thead><tr>${head}</tr></thead><tbody>`,
     bodyRows.length === 0
@@ -796,10 +820,10 @@ export function renderLedger(rows: any[], totals: any[], sandbox: boolean, event
 export function renderStatus(data: any): string {
   const chain = data.auditChain ?? {};
   const counts = data.archiveCounts ?? {};
-  const webhooks = (data.webhooksByType ?? []) as any[];
+  const webhooks = (data.webhooks?.byType ?? []) as any[];
   const body = join([
     `<h1>Desk status</h1>`,
-    `<p class="lede">No login, no secrets: the audit chain is re-walked every time this page opens, the counts are read from the data, and the ledger re-asserts its own balance. Aggregate only — this page names no operator, no party and no document.</p>`,
+    `<p class="lede">No login, no secrets: the audit chain is re-walked every time this page opens, the counts are read from the data, and the ledger re-asserts its own balance. Aggregate only — this page names no operator, no party and no document. Times are UTC.</p>`,
     `<h2>The audit chain</h2>
      <table><tbody>
        <tr><th>Integrity</th><td class="${chain.ok ? 's-verified' : 's-refused'}">${chain.ok ? 'Intact — every hash in the chain recomputes' : `Broken at entry ${chain.brokenAt}: ${esc(chain.reason ?? '')}`}</td></tr>
@@ -812,17 +836,22 @@ export function renderStatus(data: any): string {
            <td class="num">${Number(counts.verified ?? 0).toLocaleString('en-US')}</td>
            <td class="num">${Number(counts.funded ?? 0).toLocaleString('en-US')}</td></tr>
      </tbody></table>`,
-    `<h2>The settlement book</h2>
-     <table><thead><tr><th>Account</th><th>Kind</th><th class="r">Balance</th></tr></thead><tbody>
-     ${(data.ledgerTotals ?? []).map((t: any) => `<tr><td class="mono">${esc(t.account)}</td><td class="muted">${esc(t.kind)}</td><td class="r num">${formatCents(Number(t.balance))}</td></tr>`).join('')}
-     </tbody></table>`,
+    `<h2>The settlement book, by account kind</h2>
+     ${(data.ledgerByKind ?? []).length === 0
+       ? `<p class="note">No postings yet. Nothing in the seeded book has been funded, so the ledger is empty — which is the honest state, not a hidden one. Fund a slice and this table fills from the same posting code the tests exercise.</p>`
+       : `<table><thead><tr><th>Kind</th><th class="r">Accounts</th><th class="r">Debits</th><th class="r">Credits</th><th class="r">Balance</th></tr></thead><tbody>
+     ${(data.ledgerByKind ?? []).map((t: any) => `<tr><td class="mono">${esc(t.kind)}</td><td class="r num">${Number(t.accounts)}</td>
+       <td class="r num">${formatCents(Number(t.debits))}</td><td class="r num">${formatCents(Number(t.credits))}</td>
+       <td class="r num">${formatCents(Number(t.balance))}</td></tr>`).join('')}
+     </tbody></table>
+     <p class="note">Party accounts are folded into their kind: this page says what the book is made of, not who is in it.</p>`}`,
     `<h2>Webhooks PayPal delivered</h2>
      ${webhooks.length === 0
        ? `<p class="note">None yet.</p>`
-       : `<table><thead><tr><th>Event</th><th class="r">Delivered</th><th class="r">Signature verified</th></tr></thead><tbody>
-         ${webhooks.map((w) => `<tr><td class="mono small">${esc(w.type)}</td><td class="r num">${Number(w.n)}</td><td class="r num">${Number(w.verified ?? 0)}</td></tr>`).join('')}
+       : `<table><thead><tr><th>Event</th><th class="r">Delivered</th><th class="r">Signature verified</th><th class="r">Stored unverified</th></tr></thead><tbody>
+         ${webhooks.map((w) => `<tr><td class="mono small">${esc(w.type)}</td><td class="r num">${Number(w.n)}</td><td class="r num">${Number(w.verified ?? 0)}</td><td class="r num">${Number(w.unverified ?? 0)}</td></tr>`).join('')}
          </tbody></table>
-         <p class="note">Last delivery: ${esc(String(data.lastWebhookAt ?? '—').replace('T', ' ').slice(0, 19))}. Only a signed event can change a position; an unverified one is kept as evidence and ignored.</p>`}`,
+         <p class="note">${Number(data.webhooks?.total ?? 0).toLocaleString('en-US')} deliveries: ${Number(data.webhooks?.verified ?? 0).toLocaleString('en-US')} verified, ${Number(data.webhooks?.unverified ?? 0).toLocaleString('en-US')} stored unverified. Last delivery (UTC): ${esc(String(data.lastWebhookAt ?? '\u2014').replace('T', ' ').slice(0, 19))}. Only a signed event can change a position; an unverified one is kept as evidence and ignored.</p>`}`,
     `<p class="note" style="margin-top:24px">The same data as JSON: <a class="mono" href="/api/status">/api/status</a>. The desk's full machine surface — the book, each deal room, the ledger — starts at <a class="mono" href="/api/invoices">/api/invoices</a>, signed in as the desk.</p>`
   ]);
   return layout({ title: 'Status', current: '/status', sandbox: !!data.sandbox, canSubmit: false }, body);

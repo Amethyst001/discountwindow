@@ -99,7 +99,7 @@ function seedBook(): { pricedId: string; fundedId: string; refusedId: string } {
 
 const book = seedBook();
 
-async function boot(): Promise<() => Promise<void>> {
+async function boot(opts: { offline?: boolean } = {}): Promise<() => Promise<void>> {
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(ROOT, 'src', 'server.ts')], {
     cwd: ROOT,
     env: {
@@ -110,7 +110,15 @@ async function boot(): Promise<() => Promise<void>> {
       EXTRACT_API_KEY: '', EXTRACT_B_API_KEY: '',
       // And the webhook id is deliberately empty, so a forged event fails its signature check
       // locally instead of asking PayPal to verify it over the network.
-      PAYPAL_WEBHOOK_ID: ''
+      PAYPAL_WEBHOOK_ID: '',
+      // An empty string wins over the .env file (config reads process.env first), so `offline`
+      // really is offline even on a machine that holds sandbox keys.
+      ...(opts.offline
+        ? {
+            PAYPAL_CLIENT_ID: '', PAYPAL_CLIENT_SECRET: '',
+            PAYPAL_SELLER_EMAIL: '', PAYPAL_PLATFORM_EMAIL: '', PAYPAL_FUNDER_EMAIL: ''
+          }
+        : {})
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -236,12 +244,13 @@ test('the machine surface: a public status page, a desk-only JSON API, and a web
   }
 });
 
-test('a webhook without a verifying signature is kept as evidence and never acts; a replay is answered once', async () => {
+test('a webhook that cannot be verified is answered 503 and stored nowhere, so PayPal retries instead of losing it', async () => {
   const stop = await boot();
   try {
     // The event is well-formed and names a real funded invoice through its custom_id. With no
-    // webhook id configured, the signature check cannot run — so this is exactly what an
-    // attacker's forged POST looks like: the right shape, no PayPal signature.
+    // webhook id configured, the signature check cannot run. That is not a definite "bad
+    // signature"; it is "we could not ask". Storing it would make PayPal's retry look like a
+    // duplicate, so the route must answer non-2xx and leave no row.
     const event = {
       id: 'WH-TEST-REPLAY-1',
       event_type: 'PAYMENT.CAPTURE.REFUNDED',
@@ -250,34 +259,20 @@ test('a webhook without a verifying signature is kept as evidence and never acts
     const post1 = await fetch(`${BASE}/webhooks/paypal`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event)
     });
-    assert.equal(post1.status, 200);
-    assert.equal(await post1.text(), 'unverified, stored');
+    assert.equal(post1.status, 503);
+    assert.equal(await post1.text(), 'signature verification unavailable; retry');
 
-    // Stored as evidence, and the position it names is untouched: no freeze, no status change.
+    // Nothing was stored, and the position it names is untouched: no freeze, no status change.
     const after1 = JSON.parse(await (await get(`/api/invoices/${book.fundedId}`, `desk:${DESK}`)).text());
     assert.equal(after1.invoice.status, 'funded');
+    const ledger = JSON.parse(await (await get('/api/ledger', `desk:${DESK}`)).text());
+    assert.equal(ledger.recentWebhooks.filter((w: any) => w.type === 'PAYMENT.CAPTURE.REFUNDED').length, 0);
 
-    // The replay — same event id, byte for byte — is answered 'duplicate' and does not add a row.
+    // The replay is the same answer, and still no row: the retry has not been poisoned.
     const replay = await fetch(`${BASE}/webhooks/paypal`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event)
     });
-    assert.equal(replay.status, 200);
-    assert.equal(await replay.text(), 'duplicate');
-
-    // A different event id carrying the same forged content is a new delivery: stored again,
-    // unverified again, still no action.
-    const event2 = { ...event, id: 'WH-TEST-REPLAY-2' };
-    const post2 = await fetch(`${BASE}/webhooks/paypal`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event2)
-    });
-    assert.equal(await post2.text(), 'unverified, stored');
-
-    // Two unverified refunds delivered; the machine surface shows both as signature-unverified,
-    // and the invoice is still funded.
-    const ledger = JSON.parse(await (await get('/api/ledger', `desk:${DESK}`)).text());
-    const refunds = ledger.recentWebhooks.filter((w: any) => w.type === 'PAYMENT.CAPTURE.REFUNDED');
-    assert.equal(refunds.length, 2);
-    for (const w of refunds) assert.equal(w.verified, 0);
+    assert.equal(replay.status, 503);
     const after2 = JSON.parse(await (await get(`/api/invoices/${book.fundedId}`, `desk:${DESK}`)).text());
     assert.equal(after2.invoice.status, 'funded');
   } finally {
@@ -332,6 +327,24 @@ test('fix-my-refusal: a corrected document comes back as a new receivable, and t
     const reusedPage = await (await get(`/invoices/${reusedId}`, `desk:${DESK}`)).text();
     assert.match(reusedPage, /EVIDENCE_REUSED/);
     assert.match(reusedPage, /One delivery, one advance/);
+  } finally {
+    await stop();
+  }
+});
+
+test('with no sandbox keys a fund press is answered 503 before any order exists, and says nothing was sent', async () => {
+  const stop = await boot({ offline: true });
+  try {
+    const before = JSON.parse(await (await get(`/api/invoices/${book.pricedId}`, `desk:${DESK}`)).text());
+    const res = await post(`/invoices/${book.pricedId}/fund`, `funder:${SHARED}`);
+    assert.equal(res.status, 503);
+    const body = await res.text();
+    assert.match(body, /Sandbox keys are needed for this step/);
+    assert.match(body, /Nothing was sent to PayPal/);
+    // No slice, no commitment, no order row: the refusal happened before the book was touched.
+    const after = JSON.parse(await (await get(`/api/invoices/${book.pricedId}`, `desk:${DESK}`)).text());
+    assert.equal(after.invoice.status, before.invoice.status);
+    assert.equal((after.slices ?? []).length, (before.slices ?? []).length);
   } finally {
     await stop();
   }

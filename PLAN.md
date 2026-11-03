@@ -1,5 +1,11 @@
 # The Discount Window — plan, architecture and SDLC
 
+> **Working journal, not the submission.** Numbers in this file are the ones that were true when
+> the entry was written; several were later corrected (the refused count, the test count, the demo
+> invoices). The current truth is the running app, `README.md` and `DEVPOST.md`. Read this for the
+> reasoning, not for a figure.
+
+
 Status: built and measured, 2026-10-30. This file is the design record; the README is the product page.
 Event: PayPal AI Hackathon (Devpost). Closes Thu 12 Nov 2026, 21:00 WAT.
 Repo: new, `discountwindow`, MIT. No code reused from any earlier project.

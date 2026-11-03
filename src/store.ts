@@ -226,7 +226,16 @@ export function listInvoices(db: DatabaseSync, filter?: { status?: string }): an
       JOIN sellers s ON s.id = i.seller_id
       JOIN debtors d ON d.id = i.debtor_id
      ${filter?.status ? 'WHERE i.status = ?' : ''}
-     ORDER BY i.created_at DESC, i.invoice_number
+     ORDER BY CASE i.invoice_number
+                WHEN 'A-1043' THEN 0
+                WHEN 'A-1043-R2' THEN 1
+                WHEN 'A-1054' THEN 2
+                WHEN 'A-1042' THEN 3
+                WHEN 'NW-2277' THEN 4
+                WHEN 'MT-2207' THEN 5
+                WHEN 'B-2201' THEN 6
+                ELSE 7 END,
+              i.created_at DESC, i.invoice_number
   `).all(...(filter?.status ? [filter.status] : []));
   return rows as any[];
 }
@@ -350,6 +359,23 @@ export function ledgerTotals(db: DatabaseSync): any[] {
            SUM(e.debit_cents) - SUM(e.credit_cents) AS balance
       FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id
      GROUP BY a.code ORDER BY a.code
+  `).all() as any[];
+}
+
+/**
+ * The public status page's view of the ledger: totals by account kind, never by account code.
+ * Account codes carry party ids (`funder:funder-firstlight:outlay`), so grouping by code would put
+ * a counterparty's name on an unauthenticated page. Grouping by kind says what the book is made of
+ * without naming who is in it.
+ */
+export function ledgerByKind(db: DatabaseSync): any[] {
+  return db.prepare(`
+    SELECT a.kind,
+           SUM(e.debit_cents) AS debits, SUM(e.credit_cents) AS credits,
+           SUM(e.debit_cents) - SUM(e.credit_cents) AS balance,
+           COUNT(DISTINCT a.code) AS accounts
+      FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id
+     GROUP BY a.kind ORDER BY a.kind
   `).all() as any[];
 }
 

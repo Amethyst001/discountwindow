@@ -4,13 +4,14 @@ import nodePath from 'node:path';
 import crypto from 'node:crypto';
 import { config, isSandbox, assertSandbox } from './config.ts';
 import { basicAuthIdentity, roleAllows, type Identity } from './auth.ts';
-import { openDb, newId, nowIso } from './db.ts';
-import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, resolveWebhookInvoice, freezeForDispute, releaseFreeze, markCaptureCompleted, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim, nextResubmissionNumber, recordResubmission } from './store.ts';
+import { openDb, nowIso } from './db.ts';
+import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, ledgerByKind, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim, nextResubmissionNumber, recordResubmission } from './store.ts';
 import { storedNotice, recordNoticeService, noticeServiceCsv } from './notice.ts';
 import { renderBook, renderDealRoom, renderLedger, renderArchive, renderSubmit, renderStatus, viewOf } from './pages.ts';
 import { verifyChain, appendAudit } from './audit.ts';
-import { verifyWebhookSignature, getOrder, searchTransactions } from './paypal.ts';
-import { normalizeTransactions, reconcileRailHistory } from './rail.ts';
+import { verifyWebhookSignature, getOrder, getCapture, searchTransactions } from './paypal.ts';
+import { normalizeTransactions, normalizeCaptures, reconcileRailHistory, reconcileCaptureHistory } from './rail.ts';
+import { handleWebhook, type Verification } from './webhook.ts';
 import { sellerActionFor } from './gate.ts';
 import type { Cents } from './money.ts';
 import type { DebtorHistory } from './score.ts';
@@ -101,30 +102,100 @@ function noticePage(title: string, message: string, back: string): string {
     <h1 style="font-family:Georgia,serif;font-weight:500">${esc(title)}</h1><p>${esc(message)}</p><p><a href="${esc(back)}">Back to the invoice</a></p>`;
 }
 
-/** Everything the status page and /api/status show, computed on request, aggregate only. */
+/** The five settings a money movement needs. Reading the book, the gate and a refusal never need them. */
+function paypalConfigured(): boolean {
+  return Boolean(config.clientId && config.clientSecret && config.sellerEmail && config.platformEmail && config.funderEmail);
+}
+
+function sandboxKeysPage(back: string): string {
+  return noticePage(
+    'Sandbox keys are needed for this step',
+    'This build has no PayPal sandbox credentials in .env, so it will not pretend to move money. Reading the book, the evidence gate, the refusal and the replay all work offline. Funding and maturity need PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_SELLER_EMAIL, PAYPAL_PLATFORM_EMAIL and PAYPAL_FUNDER_EMAIL; .env.example lists them. Nothing was sent to PayPal.',
+    back
+  );
+}
+
+/** Everything the status page and /api/status show, computed on request. Aggregate only: no account
+ *  code, party id, operator or document. */
 function statusData(db: ReturnType<typeof openDb>) {
+  const webhooks = db.prepare(`
+    SELECT type, COUNT(*) AS n,
+           SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) AS verified,
+           SUM(CASE WHEN verified = 0 THEN 1 ELSE 0 END) AS unverified
+      FROM webhook_events GROUP BY type ORDER BY n DESC
+  `).all() as any[];
   return {
     sandbox: isSandbox(),
     generatedAt: nowIso(),
+    timesAre: 'UTC',
     auditChain: verifyChain(db),
     archiveCounts: archiveCounts(db),
-    ledgerTotals: ledgerTotals(db),
-    webhooksByType: db.prepare('SELECT type, COUNT(*) AS n, SUM(verified) AS verified FROM webhook_events GROUP BY type ORDER BY n DESC').all(),
+    ledgerByKind: ledgerByKind(db),
+    webhooks: {
+      total: webhooks.reduce((a, w) => a + Number(w.n), 0),
+      verified: webhooks.reduce((a, w) => a + Number(w.verified), 0),
+      unverified: webhooks.reduce((a, w) => a + Number(w.unverified), 0),
+      byType: webhooks
+    },
     lastWebhookAt: (db.prepare('SELECT MAX(received_at) AS at FROM webhook_events').get() as any)?.at ?? null
   };
 }
 
 /**
- * The debtor's record for a new intake. With RAIL_HISTORY=1 and a rail reference on the debtor,
- * the scorecard is reconciled against this account's own PayPal transactions — the rail's
- * timestamps for when money actually landed, not the paper's claim — and the choice is written to
- * the audit chain either way. A rail that will not answer is not allowed to become a worse guess:
- * the desk falls back to the declared record and records why.
+ * The debtor's record for a new intake. With RAIL_HISTORY=1 the scorecard is reconciled against
+ * this desk's own PayPal records, strongest source first:
+ *
+ *   1. The maturity captures the desk itself settled for this debtor. Each capture id is read back
+ *      from `GET /v2/payments/captures/{id}`, which is the same account, the same payer and the
+ *      same invoice (`custom_id`), so no amount-and-email guess is involved.
+ *   2. Transaction Search over this account, for payments that predate the book. Only `S` counts;
+ *      a `P` row has not landed and cannot make a debtor look on time.
+ *
+ * A rail that will not answer is not allowed to become a worse guess: the desk falls back to the
+ * declared record and records why. The source is written to the audit chain either way.
  */
 async function intakeHistory(db: ReturnType<typeof openDb>, debtorId: string, faceCents: Cents): Promise<DebtorHistory> {
   const declared = debtorHistory(db, debtorId, faceCents);
   if (config.railHistory !== '1') return declared;
   const ref = (db.prepare('SELECT rail_ref FROM debtors WHERE id = ?').get(debtorId) as any)?.rail_ref;
+
+  // Source 1: the desk's own maturity captures.
+  try {
+    const settled = db.prepare(`
+      SELECT i.id AS invoiceId, i.due_on AS dueOn, i.face_cents AS faceCents, m.captures_json AS capturesJson
+        FROM invoices i JOIN maturity_orders m ON m.invoice_id = i.id
+       WHERE i.debtor_id = ? AND m.status = 'captured'
+    `).all(debtorId) as any[];
+    if (settled.length > 0) {
+      const invoiceIdByCapture: Record<string, string> = {};
+      const captureIds: string[] = [];
+      for (const row of settled) {
+        let captures: any[] = [];
+        try { captures = JSON.parse(row.capturesJson ?? '[]'); } catch { captures = []; }
+        for (const c of captures) {
+          if (!c?.capture) continue;
+          captureIds.push(String(c.capture));
+          invoiceIdByCapture[String(c.capture)] = String(row.invoiceId);
+        }
+      }
+      if (captureIds.length > 0) {
+        const bodies = await Promise.all(captureIds.map((id) => getCapture(id).catch(() => null)));
+        const reconciled = reconcileCaptureHistory({
+          declared,
+          invoices: settled.map((r) => ({ invoiceId: String(r.invoiceId), dueOn: String(r.dueOn), amountCents: Number(r.faceCents) })),
+          captures: normalizeCaptures(bodies.filter(Boolean), invoiceIdByCapture)
+        });
+        if (reconciled.matched > 0) {
+          appendAudit(db, 'rail-history', debtorId, { source: reconciled.source, matched: reconciled.matched, captures: captureIds.length });
+          return reconciled.history;
+        }
+      }
+    }
+  } catch (err: any) {
+    appendAudit(db, 'rail-history', debtorId, { source: 'declared', captureError: String(err?.message ?? err).slice(0, 200) });
+  }
+
+  // Source 2: Transaction Search, for a debtor whose payments predate this book.
   if (!ref) return declared;
   try {
     const end = new Date();
@@ -259,7 +330,7 @@ const server = http.createServer(async (req, res) => {
       const issuedOn = field('issuedOn');
       const dueOn = field('dueOn');
       const outcome = intakeInvoice(db, {
-        seller: { id: 'seller-northwind', name: 'Northwind Components LLC', country: 'US', paypalMerchantId: config.sellerEmail || undefined },
+        seller: { id: 'seller-northwind', name: 'Northwind Components Ltd', country: 'NG', paypalMerchantId: config.sellerEmail || undefined },
         debtor: {
           id: debtor.id,
           name: debtor.legal_name,
@@ -443,7 +514,7 @@ const server = http.createServer(async (req, res) => {
       const debtor = db.prepare('SELECT id, legal_name, billing_address_json, limit_cents FROM debtors WHERE id = ?').get(refused.invoice.debtor_id) as any;
       if (!debtor) return send(res, 409, noticePage('Debtor missing', 'The debtor on the refused invoice is no longer on the book.', back), 'text/html; charset=utf-8');
       const outcome = intakeInvoice(db, {
-        seller: { id: 'seller-northwind', name: 'Northwind Components LLC', country: 'US', paypalMerchantId: config.sellerEmail || undefined },
+        seller: { id: 'seller-northwind', name: 'Northwind Components Ltd', country: 'NG', paypalMerchantId: config.sellerEmail || undefined },
         debtor: {
           id: debtor.id,
           name: debtor.legal_name,
@@ -492,6 +563,7 @@ const server = http.createServer(async (req, res) => {
       if (detail.invoice.status === 'REFUSED') return send(res, 409, 'A refusal is terminal.', 'text/plain');
       if (detail.invoice.status === 'disputed') return send(res, 409, 'This invoice is frozen by a dispute.', 'text/plain');
       if (detail.invoice.status === 'matured' || detail.invoice.status === 'settled') return send(res, 409, 'This invoice is already at maturity.', 'text/plain');
+      if (!paypalConfigured()) return send(res, 503, sandboxKeysPage(`/invoices/${id}`), 'text/html; charset=utf-8');
       ensureParty(db, 'funders', { id: 'funder-demo', name: 'Sandbox Funder', paypalEmail: config.funderEmail || 'funder@example.com' });
       let slice = db.prepare("SELECT * FROM slices WHERE invoice_id = ? AND status IN ('offered','committed')").get(id) as any;
       if (!slice) {
@@ -514,6 +586,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && captureMatch) {
       if (deny('capture')) return;
       const id = captureMatch[1];
+      if (!paypalConfigured()) return send(res, 503, sandboxKeysPage(`/invoices/${id}`), 'text/html; charset=utf-8');
       if (invoiceIsFrozen(db, id)) return send(res, 409, 'This invoice is frozen by a dispute.', 'text/plain');
       const slice = db.prepare("SELECT * FROM slices WHERE invoice_id = ? AND status = 'committed'").get(id) as any;
       if (!slice) return send(res, 409, 'Nothing is waiting to be captured for this invoice.', 'text/plain');
@@ -533,6 +606,7 @@ const server = http.createServer(async (req, res) => {
       const detail = invoiceDetail(db, id);
       if (!detail) return send(res, 404, 'Not found', 'text/plain');
       if (detail.invoice.status === 'disputed') return send(res, 409, 'This invoice is frozen by a dispute.', 'text/plain');
+      if (!paypalConfigured()) return send(res, 503, sandboxKeysPage(`/invoices/${id}`), 'text/html; charset=utf-8');
       const result = await createMaturityOrder(db, id);
       res.writeHead(303, { Location: result.approveLink ?? `/invoices/${id}` });
       return res.end();
@@ -541,6 +615,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && settleCaptureMatch) {
       if (deny('capture')) return;
       const id = settleCaptureMatch[1];
+      if (!paypalConfigured()) return send(res, 503, sandboxKeysPage(`/invoices/${id}`), 'text/html; charset=utf-8');
       if (invoiceIsFrozen(db, id)) return send(res, 409, 'This invoice is frozen by a dispute.', 'text/plain');
       const row = db.prepare('SELECT * FROM maturity_orders WHERE invoice_id = ?').get(id) as any;
       if (!row) return send(res, 409, 'No maturity order for this invoice.', 'text/plain');
@@ -600,42 +675,20 @@ const server = http.createServer(async (req, res) => {
       const raw = await readBody(req);
       let event: any = null;
       try { event = JSON.parse(raw); } catch { return send(res, 400, 'bad json', 'text/plain'); }
-      const verified = await verifyWebhookSignature(req.headers as any, event).catch(() => ({ ok: false }));
-      const existing = db.prepare('SELECT id FROM webhook_events WHERE event_id = ?').get(event.id) as any;
-      if (existing) return send(res, 200, 'duplicate', 'text/plain');
-      const eventRowId = newId('wh');
-      db.prepare('INSERT INTO webhook_events (id, event_id, type, payload_json, verified, received_at) VALUES (?,?,?,?,?,?)')
-        .run(eventRowId, event.id, event.event_type ?? 'UNKNOWN', raw, verified.ok ? 1 : 0, nowIso());
-      if (!verified.ok) return send(res, 200, 'unverified, stored', 'text/plain');
-      const type = String(event.event_type ?? 'UNKNOWN');
-      const resolution = resolveWebhookInvoice(db, event);
-      let outcome = 'unmatched';
-      if (type === 'CUSTOMER.DISPUTE.CREATED' || type === 'PAYMENT.CAPTURE.REFUNDED' || type === 'PAYMENT.CAPTURE.REVERSED') {
-        if (resolution) {
-          const freeze = freezeForDispute(db, resolution.invoiceId, { eventId: event.id, via: resolution.via, kind: type, reason: event?.resource?.reason ?? null });
-          outcome = freeze.frozen ? `froze ${resolution.invoiceId} (${freeze.previousStatus}) via ${resolution.via}` : `already ${freeze.previousStatus}`;
-        }
-      } else if (type === 'CUSTOMER.DISPUTE.RESOLVED') {
-        if (resolution) {
-          const release = releaseFreeze(db, resolution.invoiceId, { eventId: event.id, via: resolution.via });
-          outcome = release.heldForClawback
-            ? `held ${resolution.invoiceId} frozen: the capture was clawed back`
-            : release.restoredTo
-              ? `released ${resolution.invoiceId} to ${release.restoredTo} via ${resolution.via}`
-              : `not frozen`;
-        }
-      } else if (type === 'PAYMENT.CAPTURE.COMPLETED') {
-        const settled = markCaptureCompleted(db, String(event?.resource?.id ?? ''));
-        outcome = settled > 0
-          ? `capture ${event?.resource?.id} cleared on ${settled} funding commitment${settled === 1 ? '' : 's'}`
-          : resolution
-            ? `capture recorded against ${resolution.invoiceId} via ${resolution.via}; no funding commitment carries it`
-            : 'no invoice to match';
+      // Distinguish "PayPal says this signature is bad" from "we could not ask". The first is a
+      // definite failure and may be stored as evidence; the second must be retried, because a
+      // dropped dispute freeze is a real position left unprotected.
+      let verification: Verification;
+      try {
+        const checked = await verifyWebhookSignature(req.headers as any, event);
+        verification = checked.status !== 200
+          ? { kind: 'error', message: `verify-webhook-signature answered ${checked.status}` }
+          : checked.ok ? { kind: 'verified' } : { kind: 'failed' };
+      } catch (err: any) {
+        verification = { kind: 'error', message: String(err?.message ?? err).slice(0, 200) };
       }
-      db.prepare('UPDATE webhook_events SET invoice_id = ?, outcome = ? WHERE id = ?')
-        .run(resolution?.invoiceId ?? null, outcome, eventRowId);
-      db.prepare('UPDATE webhook_events SET processed_at = ? WHERE event_id = ?').run(nowIso(), event.id);
-      return send(res, 200, 'ok', 'text/plain');
+      const result = handleWebhook(db, { event, raw, verification });
+      return send(res, result.status, result.body, 'text/plain');
     }
     if (req.method === 'GET' && path === '/health') {
       const chain = verifyChain(db);
