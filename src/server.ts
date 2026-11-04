@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import nodePath from 'node:path';
 import crypto from 'node:crypto';
-import { config, isSandbox, assertSandbox } from './config.ts';
+import { config, isSandbox, assertSandbox, ROOT } from './config.ts';
 import { basicAuthIdentity, roleAllows, type Identity } from './auth.ts';
 import { openDb, nowIso } from './db.ts';
 import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, ledgerByKind, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim, nextResubmissionNumber, recordResubmission } from './store.ts';
@@ -264,9 +264,11 @@ const server = http.createServer(async (req, res) => {
     // by somebody with no credentials at all — and PayPal's webhook POSTs. Those carry no basic
     // auth and need none: the handler refuses to act on anything whose signature does not verify,
     // so the route's authority is the signature, not the password. A GET on the webhook path is
-    // still behind the wall.
+    // still behind the wall. Brand icons are a fourth door: browsers fetch them without
+    // credentials, and a 401 there can flash a login prompt over a public demo.
     const webhookDelivery = req.method === 'POST' && path === '/webhooks/paypal';
-    const openPath = path === '/health' || path === '/status' || path === '/api/status' || webhookDelivery;
+    const favicon = req.method === 'GET' && /^\/favicon(\.ico|-32\.png|-192\.png|-512\.png)$/.test(path);
+    const openPath = path === '/health' || path === '/status' || path === '/api/status' || webhookDelivery || favicon;
     const auth = basicAuthIdentity(req.headers.authorization, config.demoPassword, config.demoPasswordsByRole);
     if (!auth.ok && !openPath) {
       res.writeHead(401, {
@@ -274,6 +276,20 @@ const server = http.createServer(async (req, res) => {
         'Content-Type': 'text/plain'
       });
       return res.end('Authentication required. Use one of the demo usernames: desk, seller, funder, debtor.');
+    }
+    if (favicon) {
+      // Served from brand/ with a fixed allow-list of names; the regex above decides what reaches here.
+      const name = path === '/favicon.ico' ? 'favicon.ico' : path.slice(1);
+      const file = nodePath.join(ROOT, 'brand', name);
+      if (!fs.existsSync(file)) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('not found');
+      }
+      res.writeHead(200, {
+        'Content-Type': name.endsWith('.ico') ? 'image/x-icon' : 'image/png',
+        'Cache-Control': 'public, max-age=86400'
+      });
+      return res.end(fs.readFileSync(file));
     }
     const identity: Identity = auth.ok ? auth.identity : { role: 'desk', name: 'desk' };
     // The lens opens to whoever signs in; the authority stays with the username (see `deny` below).

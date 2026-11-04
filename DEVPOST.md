@@ -33,6 +33,15 @@ documents — and losing on three of them: goods that were never delivered, deli
 is not the debtor, and the same paperwork funded twice. Catching that means opening the documents
 and comparing them against the debtor's record. At volume, nobody does.
 
+The scale is measured, not asserted: the Asian Development Bank's 2025 Global Trade Finance Gap
+Survey estimates unmet demand for trade finance at **$2.5 trillion** — about 10% of global trade,
+unchanged from 2023 — with small firms rejected for trade finance at **41%** of requests, against
+40% for large and mid-cap corporates, and 84% of the surveyed banks already using AI for fraud
+prevention and risk analysis. What the survey counts is unmet demand; what it does not capture is a
+refusal the seller can read and act on — that is the gap this desk aims at. (Asian Development Bank,
+*Demand for Trade Finance to Rise Amid Supply Chain Realignment—ADB Report*, news release,
+15 January 2026.)
+
 The cross-border leg is the constraint this build can measure. The seller is Nigerian; PayPal's
 multi-payee orders require the **platform** account to be a US business — a Nigerian business account
 is refused at checkout with `PAYEE_ACCOUNT_LOCKED_OR_CLOSED`, and that measurement is in the README
@@ -482,3 +491,19 @@ chase a prize.
 - **Video:** the script and shot list are in [`VIDEO.md`](VIDEO.md) — under three minutes, no music,
   no third-party marks, recorded from this build at 1440 px. Nothing in it is re-enacted: every page
   it shows exists in the book.
+
+## Submission assets
+
+All brand pieces come from this build's own palette (`src/html.ts`: paper `#f4efe4`, ink `#191712`,
+oxblood `#78211f`) — no third-party marks anywhere in the pack.
+
+- **Thumbnail and video frame:** `brand/05_thumbnail.jpg` — 1280×720, the wordmark and tagline on the
+  left, one invoice carrying a single REFUSED verdict with its reason on the right. Lead image for the
+  gallery and the YouTube thumbnail.
+- **Gallery:** `brand/03_palette_type.png` (colour and type sheet rendered from the app's CSS) and
+  `brand/01_logo_primary.jpg`.
+- **In-app:** the app serves its own favicon from `/favicon.ico` (`brand/`, recoloured to the app's
+  ink), and the invoice card on the banner carries A-1043's real refusal — `CONSIGNEE MISMATCH`,
+  $48,000, Northwind Components Ltd — the same numbers the Start-here strip opens on. One invoice,
+  one verdict: the banner shows a single stamp because the product refuses or prices each invoice,
+  never both.

@@ -12,6 +12,7 @@ COPY src ./src
 COPY rules ./rules
 COPY scripts ./scripts
 COPY evidence/published ./evidence/published
+COPY brand/favicon.ico brand/favicon-32.png brand/favicon-192.png ./brand/
 
 RUN mkdir -p /app/data && chown -R node:node /app/data
 USER node

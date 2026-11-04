@@ -146,6 +146,15 @@ test('the routes enforce the login, the name and the verb — over HTTP, not in 
     // /health is the one open door, so a container can check itself; everything else answers 401.
     assert.equal((await get('/health')).status, 200);
     assert.equal((await get('/')).status, 401);
+    // Brand icons ride with /health: browsers ask for them without credentials, and a 401 there
+    // would flash a login prompt over a public demo. The allow-list decides what is served.
+    const favicon = await get('/favicon.ico');
+    assert.equal(favicon.status, 200);
+    assert.match(favicon.headers.get('content-type') ?? '', /^image\/x-icon/);
+    assert.equal((await get('/favicon-32.png')).headers.get('content-type'), 'image/png');
+    assert.equal((await get('/favicon-512.png')).status, 200);
+    // A name outside the allow-list is not a door at all: it sits behind the login like everything else.
+    assert.equal((await get('/favicon-999.png')).status, 401);
     // A username that is not one of the four is refused rather than quietly given the desk.
     assert.equal((await get('/', `judge:${SHARED}`)).status, 401);
     // A side holding its own secret stops accepting the shared one: the desk is not a password away
