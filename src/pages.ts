@@ -621,6 +621,10 @@ function profileNote(j: Jurisdiction): string {
   </div>`;
 }
 
+function readableCode(code: string): string {
+  return String(code ?? 'refused').toLowerCase().replace(/_/g, ' ');
+}
+
 export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk', identity?: Identity | null): string {
   const { invoice, checks, score, price, extraction, audit, slices, decisions, maturity, defaultEvent } = detail;
   const profile = profileOf(invoice);
@@ -628,19 +632,11 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
   const refused = invoice.status === 'REFUSED';
   const failing = checks.filter((c: any) => Number(c.passed) === 0);
   const overrideRow = checks.find((c: any) => c.check_id === 'E00' && Number(c.passed) === 1 && /override/i.test(c.detail));
-  // E00 can pass without the rail having vouched for anything. That is a priced condition, so the
-  // page says so where the price is, rather than leaving "verified" to imply corroboration.
   const uncorroborated = checks.some((c: any) => c.check_id === 'E00' && /uncorroborated/i.test(String(c.detail)));
-  // A document refused under E06 is not stored twice — one file, one row — so this invoice has no
-  // bytes of its own to show. The refusal still says exactly what it collided with.
   const reusedEvidenceNote = String(
     checks.find((c: any) => c.check_id === 'E06' && Number(c.passed) === 0)?.detail
       ?? 'No document is filed against this invoice.'
   );
-  const needles = failing.map((c: any) => {
-    const region = String(c.evidence_region ?? '');
-    return region.split('.').pop() ?? '';
-  });
   const docLines = rawText.split('\n');
   const disagreementMarks = readerDisagreementMarks((() => {
     try { return JSON.parse(extraction?.fields_json ?? '{}').notes; } catch { return []; }
@@ -655,8 +651,6 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
     const gate = decisions.find((d: any) => d.kind === 'gate');
     try { return gate?.reasons_json ? JSON.parse(gate.reasons_json) : []; } catch { return []; }
   })();
-  // A pricing refusal is a refusal with its own reason — the band's own verdict, not the gate's —
-  // and the card should say so rather than a bare REFUSED.
   const pricingRefusal: any[] = (() => {
     const pricing = decisions.find((d: any) => d.kind === 'pricing' && d.verdict === 'REFUSED');
     try { return pricing?.reasons_json ? JSON.parse(pricing.reasons_json) : []; } catch { return []; }
@@ -666,70 +660,62 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
   const refusalRule = refusalList[0]?.rule ?? '';
   const reading = extractionReadBy(extraction);
 
-  // A commitment is not money yet. When every share is committed but nothing has been captured,
-  // "Partly funded" overstates what happened; the honest state is approval outstanding.
   const committedBp = slices.filter((s: any) => s.status === 'paid' || s.status === 'committed').reduce((n: number, s: any) => n + Number(s.share_bp), 0);
   const paidBp = slices.filter((s: any) => s.status === 'paid').reduce((n: number, s: any) => n + Number(s.share_bp), 0);
   const awaitingApproval = invoice.status === 'partially_funded' && committedBp >= 10_000 && paidBp === 0;
   const statusText = awaitingApproval ? 'Committed, awaiting approval' : statusLabel[invoice.status] ?? invoice.status;
 
-  const body = join([
-    roleStrip(`/invoices/${invoice.id}`, view, identity),
-    `<div class="small muted" style="margin-top:24px"><a href="/">The book</a> / ${esc(invoice.invoice_number)}</div>`,
-    `<h1>${esc(invoice.debtor_name)}</h1>`,
-    `<p class="lede">${esc(invoice.seller_name)} invoiced ${formatCents(Number(invoice.face_cents))}, issued ${esc(invoice.issued_on)}, due ${esc(invoice.due_on)}.
-      Status: <span class="${statusClass(invoice.status)}">${esc(statusText)}</span>.</p>`,
-    detail.resubmission?.of ? `<p class="note">Corrected submission of <a href="/invoices/${esc(detail.resubmission.of.id)}">${esc(detail.resubmission.of.invoiceNumber)}</a> (${esc(detail.resubmission.of.status)}). The refusal on that invoice stands; this is the document that answers it.</p>` : '',
-    detail.resubmission?.corrections?.length ? `<p class="note">A corrected submission exists: ${detail.resubmission.corrections.map((c: any) => `<a href="/invoices/${esc(c.id)}">${esc(c.invoiceNumber)}</a> (${esc(c.status)})`).join(', ')}.</p>` : '',
-    roleCard(invoice, price, slices, view),
-    overrideRow ? `<div class="override" style="margin-bottom:24px"><strong>Sandbox override applied to E00.</strong> PayPal did not return an eligible ${esc(profile.protectionProgram)} status for the sandbox account in use. The raw status is shown below, the override is written to the audit chain, and it cannot be enabled outside the sandbox.</div>` : '',
-    uncorroborated ? `<div class="override" style="margin-bottom:24px"><strong>E00 found no rail transaction behind this sale.</strong> Nothing on PayPal corroborates it, so the desk is pricing on the documents and the debtor's record alone: a band-A score is held at B, and the advance ceiling falls with it. This is a stated absence, not a passed check.</div>` : '',
-    `<div class="grid cols-3">`,
-    // Left: the document
-    `<section>
+  // Headline and one-sentence reason, so the verdict is the first thing read rather than the debtor's name.
+  const verdictClass = refused ? 'is-refused' : invoice.status === 'funded' ? 'is-funded' : 'is-priced';
+  const headline = refused
+    ? `Refused: ${readableCode(refusalCode)}`
+    : price
+      ? `Priced: ${formatCents(Number(price.advance_cents))} advance`
+      : invoice.debtor_name;
+  const verdictLine = refused
+    ? String(failing[0]?.detail ?? refusalList[0]?.rule ?? 'A check failed, and the reason is recorded below.')
+    : `${invoice.seller_name} invoiced ${formatCents(Number(invoice.face_cents))} to ${invoice.debtor_name}, issued ${invoice.issued_on}, due ${invoice.due_on}.`;
+  const checksHeading = refused ? 'The eleven checks — what failed, and what passed' : 'The eleven checks';
+  // Every refusal reason carries its own fix sentence: the seller reads what to do about each, not just the first.
+  const reasonBlocks = refusalList.map((g: any) => {
+    const fix = g.sellerAction ?? sellerActionFor(g.code) ?? '';
+    const rule = g.rule ? ` <span class="muted">Rule: ${esc(g.rule)}</span>` : '';
+    const action = fix ? ` <span class="muted">What the seller can do:</span> ${esc(fix)}` : '';
+    return `<p class="small" style="margin:10px 0 0"><span class="code-chip">${esc(g.code ?? 'REFUSED')}</span>${rule}${action}</p>`;
+  }).join('');
+  const reasonArea = refused ? reasonBlocks : '';
+  const fixCard = refused && mayPress('submit', identity) ? `<div class="card strong" style="margin-top:26px">
+      <h3>Fix this refusal</h3>
+      <p class="small muted" style="margin-top:0">Upload the corrected proof of delivery. A resubmission is a new receivable that names this one: the refusal and its audit entry stay exactly where they are, the seller's invoice number gains a revision, and the same document cannot come back — E06 will say so.</p>
+      <form method="post" action="/invoices/${esc(invoice.id)}/resubmit" enctype="multipart/form-data" style="margin:10px 0 0">
+        <p style="margin:0 0 10px"><input type="file" name="evidence" required></p>
+        <p style="margin:0"><button type="submit">Submit the corrected document</button></p>
+      </form>
+    </div>` : '';
+  const resubmissionNote = detail.resubmission?.of
+    ? `<p class="note">Corrected submission of <a href="/invoices/${esc(detail.resubmission.of.id)}">${esc(detail.resubmission.of.invoiceNumber)}</a> (${esc(detail.resubmission.of.status)}). The refusal on that invoice stands; this is the document that answers it.</p>`
+    : '';
+  const correctionsNote = detail.resubmission?.corrections?.length
+    ? `<p class="note">A corrected submission exists: ${detail.resubmission.corrections.map((c: any) => `<a href="/invoices/${esc(c.id)}">${esc(c.invoiceNumber)}</a> (${esc(c.status)})`).join(', ')}.</p>`
+    : '';
+  const overrideNote = overrideRow ? `<div class="override" style="margin-bottom:24px"><strong>Sandbox override applied to E00.</strong> PayPal did not return an eligible ${esc(profile.protectionProgram)} status for the sandbox account in use. The raw status is shown below, the override is written to the audit chain, and it cannot be enabled outside the sandbox.</div>` : '';
+  const uncorroboratedNote = uncorroborated ? `<div class="override" style="margin-bottom:24px"><strong>E00 found no rail transaction behind this sale.</strong> Nothing on PayPal corroborates it, so the desk is pricing on the documents and the debtor's record alone: a band-A score is held at B, and the advance ceiling falls with it. This is a stated absence, not a passed check.</div>` : '';
+
+  const evidenceSection = `<section>
       <h3>The evidence</h3>
       ${detail.evidence ? `<div class="doc">${highlightDocument(rawText.slice(0, 4000), highlightWords)}</div>
       ${highlightWords.length ? `<p class="small muted" style="margin:8px 0 0">Marked in the document: ${disagreementMarks.length ? 'what the two readers could not agree on' : 'the field a check failed on'}${disagreementMarks.length && failing.length ? ', and the field a check failed on' : ''}.</p>` : ''}
       <p class="small muted" style="margin-top:10px">SHA-256 <span class="hash">${esc(detail.evidence?.sha256?.slice(0, 32) ?? '')}…</span></p>`
         : `<p class="small">${esc(reusedEvidenceNote)}</p>`}
       ${reading}
-    </section>`,
-    // Centre: the checks
-    `<section>
-      <h3>The eleven checks</h3>
-      ${profileNote(profile)}
-      ${refused ? `<div class="refusal" style="margin-bottom:18px">
-        <h2>Refused</h2>
-        <p style="margin:0 0 12px">${esc(failing[0]?.detail ?? 'A check failed.')}</p>
-        ${refusalList.length ? refusalList.map((g: any) => {
-          const fix = g.sellerAction ?? sellerActionFor(g.code) ?? '';
-          return `<div style="margin:0 0 14px">
-            <span class="code-chip">${esc(g.code ?? 'REFUSED')}</span>
-            ${g.rule ? `<p class="small muted" style="margin:8px 0 0">Rule: ${esc(g.rule)}</p>` : ''}
-            ${fix ? `<p class="small" style="margin:8px 0 0"><strong>What the seller can do:</strong> ${esc(fix)}</p>` : ''}
-          </div>`;
-        }).join('') : `<span class="code-chip">${esc(refusalCode)}</span><p class="small muted" style="margin:8px 0 0">Rule: ${esc(refusalRule)}</p>`}
-      </div>` : ''}
-      ${refused && mayPress('submit', identity) ? `<div class="card" style="margin-bottom:18px">
-        <h3>Fix this refusal</h3>
-        <p class="small muted" style="margin-top:0">Upload the corrected proof of delivery. A resubmission is a new receivable that names this one: the refusal and its audit entry stay exactly where they are, the seller's invoice number gains a revision, and the same document cannot come back — E06 will say so.</p>
-        <form method="post" action="/invoices/${esc(invoice.id)}/resubmit" enctype="multipart/form-data" style="margin:10px 0 0">
-          <p style="margin:0 0 10px"><input type="file" name="evidence" required></p>
-          <p style="margin:0"><button type="submit">Submit the corrected document</button></p>
-        </form>
-      </div>` : ''}
-      <div class="card">${checks.map((c: any) => checkRow(c, profile)).join('')}</div>
-    </section>`,
-    // Right: money
-    `<section>
-      <h3>The arithmetic</h3>
-      <div class="card" style="margin-bottom:18px">
-        ${score ? `<dl class="kv">
+    </section>`;
+
+  const scoreCard = score ? `<div class="card" style="margin-bottom:18px"><dl class="kv">
           <dt>Debtor score</dt><dd class="em">${score.score} <span class="muted">band ${esc(score.band)}</span></dd>
           ${Object.entries(components ?? {}).map(([k, v]: any) => `<dt class="muted">${esc(k)}</dt><dd class="muted">${v.points}/${v.max}</dd>`).join('')}
-        </dl>` : '<p class="muted">No score.</p>'}
-      </div>
-      ${price ? `<div class="card">
+        </dl></div>` : '<div class="card" style="margin-bottom:18px"><p class="muted" style="margin:0">No score.</p></div>';
+
+  const priceCard = price ? `<div class="card strong">
         <dl class="kv">
           <dt>Annual rate</dt><dd>${(Number(price.annual_rate_bp) / 100).toFixed(1)}%</dd>
           <dt>Tenor</dt><dd>${price.tenor_days} days</dd>
@@ -740,28 +726,62 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
           <dt>Advance</dt><dd class="em">${formatCents(Number(price.advance_cents))}</dd>
           <dt>Platform fee</dt><dd>${formatCents(Number(price.platform_fee_cents))}</dd>
         </dl>
-      </div>` : ''}
+      </div>` : '';
+
+  const slicesBlock = slices.length ? `<hr class="rule"><h3>Slices</h3><table><thead><tr><th>Funder</th><th class="r">Share</th><th class="r">Principal</th><th>Order</th><th>Capture</th></tr></thead><tbody>
+      ${slices.map((s: any) => `<tr><td>${esc(s.funder_name ?? 'unassigned')}</td><td class="r num">${(Number(s.share_bp) / 100).toFixed(0)}%</td>
+        <td class="r num">${formatCents(Number(s.principal_cents))}</td>
+        <td class="mono small">${esc(s.paypal_order_id ?? '—')}</td><td class="mono small">${esc(s.capture_id ?? '—')}</td></tr>`).join('')}
+      </tbody></table>` : '';
+
+  const noticeBlock = detail.notice ? `<hr class="rule"><h3>Notice of assignment</h3>
+      <p class="small">Issued ${esc(String(detail.notice.created_at).slice(0, 10))} to ${esc(detail.notice.addressee)}. A debtor who is never told may pay its old seller and discharge the debt, so this is the step that makes the purchase effective — kept as the exact bytes, hashed into the chain.
+      <a href="/invoices/${esc(invoice.id)}/notice">Read the notice</a>
+      <span class="muted"> · SHA-256 <span class="hash">${esc(String(detail.notice.sha256).slice(0, 32))}…</span> — hash the downloaded file to check it against this.</span></p>
+      ${view === 'desk' && (!identity || identity.role === 'desk') ? serviceRegister(invoice, detail.noticeService ?? [], !identity || identity.role === 'desk') : ''}` : `<hr class="rule"><h3>Notice of assignment</h3>
+      <p class="small muted">Not issued. The desk tells the debtor where to pay only once the receivable is funded in full; a partly bought invoice has not been assigned cleanly.</p>`;
+
+  const auditBlock = `<hr class="rule"><h3>Audit chain</h3>
+      <table><thead><tr><th class="r">Seq</th><th>Event</th><th>Hash</th><th>Previous</th></tr></thead><tbody>
+      ${audit.map((a: any) => `<tr><td class="r num">${a.seq}</td><td>${esc(a.kind)}</td>
+        <td class="hash small">${esc(a.hash.slice(0, 24))}…</td><td class="hash small muted">${esc(a.prev_hash.slice(0, 24))}…</td></tr>`).join('')}
+      </tbody></table>`;
+
+  const body = join([
+    roleStrip(`/invoices/${invoice.id}`, view, identity),
+    `<div class="small muted" style="margin-top:24px"><a href="/">The book</a> / ${esc(invoice.invoice_number)}</div>`,
+    `<div class="verdict ${verdictClass}">
+      <h2>${esc(statusLabel[invoice.status] ?? invoice.status)}</h2>
+      <div class="eyebrow"><span>${esc(invoice.invoice_number)}</span><span class="status ${statusClass(invoice.status)}">${esc(statusText)}</span></div>
+      <h1>${esc(headline)}</h1>
+      <p class="verdict-line">${esc(verdictLine)}</p>
+      ${reasonArea}
+    </div>`,
+    resubmissionNote,
+    correctionsNote,
+    roleCard(invoice, price, slices, view),
+    overrideNote,
+    uncorroboratedNote,
+    `<div class="grid cols-detail">`,
+    evidenceSection,
+    `<section class="rail">
+      <h3>The arithmetic</h3>
+      ${scoreCard}
+      ${priceCard}
       ${fundAction(invoice, slices, view, identity)}
       ${maturityAction(invoice, price, maturity, view, identity)}
       ${defaultCard(invoice, price, defaultEvent, !identity || identity.role === 'desk')}
     </section>`,
     `</div>`,
-    slices.length ? `<hr class="rule"><h3>Slices</h3><table><thead><tr><th>Funder</th><th class="r">Share</th><th class="r">Principal</th><th>Order</th><th>Capture</th></tr></thead><tbody>
-      ${slices.map((s: any) => `<tr><td>${esc(s.funder_name ?? 'unassigned')}</td><td class="r num">${(Number(s.share_bp) / 100).toFixed(0)}%</td>
-        <td class="r num">${formatCents(Number(s.principal_cents))}</td>
-        <td class="mono small">${esc(s.paypal_order_id ?? '—')}</td><td class="mono small">${esc(s.capture_id ?? '—')}</td></tr>`).join('')}
-      </tbody></table>` : '',
-    detail.notice ? `<hr class="rule"><h3>Notice of assignment</h3>
-      <p class="small">Issued ${esc(String(detail.notice.created_at).slice(0, 10))} to ${esc(detail.notice.addressee)}. A debtor who is never told may pay its old seller and discharge the debt, so this is the step that makes the purchase effective — kept as the exact bytes, hashed into the chain.
-      <a href="/invoices/${esc(invoice.id)}/notice">Read the notice</a>
-      <span class="muted"> · SHA-256 <span class="hash">${esc(String(detail.notice.sha256).slice(0, 32))}…</span> — hash the downloaded file to check it against this.</span></p>
-      ${view === 'desk' && (!identity || identity.role === 'desk') ? serviceRegister(invoice, detail.noticeService ?? [], !identity || identity.role === 'desk') : ''}` : `<hr class="rule"><h3>Notice of assignment</h3>
-      <p class="small muted">Not issued. The desk tells the debtor where to pay only once the receivable is funded in full; a partly bought invoice has not been assigned cleanly.</p>`,
-    `<hr class="rule"><h3>Audit chain</h3>
-      <table><thead><tr><th class="r">Seq</th><th>Event</th><th>Hash</th><th>Previous</th></tr></thead><tbody>
-      ${audit.map((a: any) => `<tr><td class="r num">${a.seq}</td><td>${esc(a.kind)}</td>
-        <td class="hash small">${esc(a.hash.slice(0, 24))}…</td><td class="hash small muted">${esc(a.prev_hash.slice(0, 24))}…</td></tr>`).join('')}
-      </tbody></table>`
+    fixCard,
+    `<section style="margin-top:34px">
+      <h3>${esc(checksHeading)}</h3>
+      ${profileNote(profile)}
+      <div class="card">${checks.map((c: any) => checkRow(c, profile)).join('')}</div>
+    </section>`,
+    slicesBlock,
+    noticeBlock,
+    auditBlock
   ]);
 
   return layout({ title: invoice.invoice_number, current: '/', sandbox, canSubmit: mayPress('submit', identity) }, body);

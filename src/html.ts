@@ -90,6 +90,27 @@ tr.total td { border-top: 1px solid var(--ink); border-bottom: 0; font-weight: 6
 .check.fail .detail { color: var(--oxblood); }
 .refusal { border: 1px solid var(--oxblood); background: #fbf3ef; box-shadow: 4px 4px 0 rgba(120,33,31,0.12); padding: 20px 22px; }
 .refusal h2 { color: var(--oxblood); }
+.verdict { border: 1px solid var(--rule); border-left: 4px solid var(--ink); background: #faf7ef; box-shadow: 4px 4px 0 rgba(25,23,18,0.07); padding: 26px 28px 24px; margin: 16px 0 26px; }
+.verdict h2 { font-family: var(--sans); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
+.verdict.is-refused h2 { color: var(--oxblood); }
+.verdict.is-priced h2 { color: var(--gold); }
+.verdict.is-funded h2 { color: var(--olive); }
+.verdict .eyebrow { display: flex; align-items: center; gap: 14px; font-size: 0.6875rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.verdict h1 { margin: 12px 0 6px; font-size: 2.5rem; line-height: 1.08; }
+.verdict-line { margin: 0; font-size: 1.0625rem; color: var(--ink-2); max-width: 72ch; }
+.verdict.is-refused { border-left-color: var(--oxblood); background: #fbf3ef; }
+.verdict.is-refused h1 { color: var(--oxblood); }
+.verdict.is-priced { border-left-color: var(--gold); }
+.verdict.is-funded { border-left-color: var(--olive); }
+.cols-detail { grid-template-columns: minmax(0,1.55fr) minmax(0,0.95fr); }
+@media (max-width: 980px) { .cols-detail { grid-template-columns: minmax(0,1fr); } }
+.rail { position: sticky; top: 22px; align-self: start; }
+@media (max-width: 980px) { .rail { position: static; } }
+.card.strong { box-shadow: 5px 5px 0 rgba(25,23,18,0.1); border-color: #ddd5c2; }
+tbody tr:hover td { background: rgba(25,23,18,0.025); }
+button, input[type="submit"] { font-family: var(--sans); font-size: 0.8125rem; letter-spacing: 0.04em; background: var(--ink); color: var(--paper); border: 0; padding: 10px 18px; cursor: pointer; box-shadow: 3px 3px 0 rgba(25,23,18,0.16); }
+button:hover { background: #2b2823; }
+button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--ink); box-shadow: none; }
 .code-chip { font-family: var(--mono); font-size: 0.75rem; border: 1px solid var(--oxblood); color: var(--oxblood); padding: 2px 8px; display: inline-block; }
 .doc { border: 1px solid var(--rule); background: #fffdf7; padding: 20px 22px; font-family: var(--mono); font-size: 0.75rem; line-height: 1.9; white-space: pre-wrap; word-break: break-word; }
 .doc mark { background: #f2d9d6; color: var(--oxblood); padding: 0 2px; }
