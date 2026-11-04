@@ -1,5 +1,12 @@
 # Video script — under 3:00
 
+**A finished cut exists:** [`video/the-discount-window-demo.mp4`](video/the-discount-window-demo.mp4) —
+1:24, 1440×900, 25 fps, silent with burned-in captions, built from headless 1440px renders of the real
+seeded pages (no re-enactment; every frame is the app). The NW-2277 funding beat uses the honest replay
+caption pointing at `evidence/published/x5-live-funding.json`, exactly as the fallback below prescribes.
+A voice-over re-record on the same beat table is still the stronger cut — the script and timings below
+are the voice version.
+
 One take, one screen, no music, no third-party marks, 1440 px wide at 100% zoom, cursor visible.
 Every page shown exists in the seeded book. One beat can be live: the **NW-2277 funding in PayPal's
 sandbox**. If the funder login is not ready, that same beat uses the committed capture ids in
