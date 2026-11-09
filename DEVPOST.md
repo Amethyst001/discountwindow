@@ -2,6 +2,32 @@
 
 **Receivables, gated on proof.**
 
+## In one minute
+
+**Who it's for:** funders and marketplaces that pay out early against export invoices, and the small
+exporters who wait 30 to 90 days to be paid by a foreign buyer.
+
+**The problem:** a funder who pays early is betting on documents. The bet goes wrong in three ways:
+goods never delivered, delivery signed for someone other than the buyer, or the same paperwork
+funded twice. Checking every document by hand doesn't scale, so small exporters mostly go unfunded.
+
+**What it does:** the seller uploads an invoice and its proof of delivery. AI readers extract the
+fields (two independent vision models for photographed documents), and eleven deterministic checks
+decide. Each invoice is either **refused with a reason the seller can fix**, or **priced** from the
+desk's own record with the debtor. The AI reads; the rules decide.
+
+**PayPal:** Orders v2 with multi-payee purchase units, so one funder approval pays the seller's advance
+and the platform's fee as separate captures and the platform never holds the money. Webhooks are
+signature-verified before they can freeze a position. Transaction Search reconciles the debtor's
+history behind `RAIL_HISTORY=1`.
+
+**Honest scope:** PayPal sandbox only, no real money. The book of 1,007 invoices (626 refused) is
+synthetic. 166 tests. No pilots or users yet.
+
+**Links:** Video {VIDEO_URL} · Live demo {RENDER_URL} · Repo https://github.com/Amethyst001/discountwindow
+
+---
+
 A $48,000 parts invoice is refused in seconds: the proof of delivery is signed for **Halcyon
 Logistics**, and the debtor is **Halcyon Retail Group**. The seller sends the corrected document back
 as **A-1043-R2** — same face, same purchase order, a new revision number — and it passes the same
@@ -35,8 +61,7 @@ and comparing them against the debtor's record. At volume, nobody does.
 
 The scale is measured, not asserted: the Asian Development Bank's 2025 Global Trade Finance Gap
 Survey estimates unmet demand for trade finance at **$2.5 trillion** — about 10% of global trade,
-unchanged from 2023 — with small firms rejected for trade finance at **41%** of requests, against
-40% for large and mid-cap corporates, and 84% of the surveyed banks already using AI for fraud
+unchanged from 2023 — with small firms rejected for trade finance at **41%** of requests, and 84% of the surveyed banks already using AI for fraud
 prevention and risk analysis. What the survey counts is unmet demand; what it does not capture is a
 refusal the seller can read and act on — that is the gap this desk aims at. (Asian Development Bank,
 *Demand for Trade Finance to Rise Amid Supply Chain Realignment—ADB Report*, news release,
@@ -434,8 +459,8 @@ agent reads exactly what a human reviewer reads.
 ## Built during the submission period
 
 Everything here was written for this event: the gate, the scorecard, the pricing, the PayPal client,
-the ledger, the pages, the dataset generator, the API contract and the tests. **166 tests, all offline**,
-via `npm test` — and one of them boots the real server on a local port and goes through the routes
+the ledger, the pages, the dataset generator, the API contract and the tests. **166 tests, all passing and offline**
+(no network or keys needed), via `npm test` — and one of them boots the real server on a local port and goes through the routes
 rather than the functions under them: 401 for a username that is not one of the four, 401 when a side
 holding its own secret is offered the shared one, 403 when a seller POSTs a fund, 503 when a fund press
 has no sandbox keys (before any order exists), and the whole-book register CSV arriving for the desk
@@ -461,8 +486,9 @@ the evidence source is the reason the product exists.
 | Deterministic label parser (no model) | Third opinion on the transcription | Regex over the reader's own text; agrees, contradicts, or finds nothing. |
 | Node 24 (`node:http`, `node:sqlite`), `yaml`, `pdfjs-dist` | The whole runtime | Native TypeScript, no framework, no build step, no client-side JavaScript. `pdfjs-dist` exists only to read a PDF's text layer when one is present. |
 
-No sponsor SDK, hosted component or prize-chasing integration is used. The one artifact with a
-sponsor's name on it is `docs/postman-collection.json`, and it is a hand-written JSON file in Postman's
+The demo is hosted on **Render** from `render.yaml` (Docker, free plan; the container seeds the
+synthetic book on start, so every cold start shows the same desk). No sponsor SDK is used. The other
+artifact with a sponsor's name on it is `docs/postman-collection.json`, and it is a hand-written JSON file in Postman's
 public collection format, committed so the API can be exercised without a client; Postman itself is
 not a dependency of the build and no Postman workspace is part of the demo. AG Grid is not used — the
 book is three HTML tables. The same rule covers the rest of the sponsor list: nothing is bolted on to
@@ -470,11 +496,11 @@ chase a prize.
 
 ## Try it
 
-- **Repo:** see the submission's repository link. MIT licence in the About section.
-- **Run it:** `npm ci && npm run seed && npm start` — never touches the network unless a sandbox key
-  is present. This is the functional demo the rules ask for: the seeded book, the gate, the provenance
-  chain, the API and the register all work offline from one command. Port 3000 unless `PORT` says
-  otherwise.
+- **Repo:** https://github.com/Amethyst001/discountwindow (MIT licence, shown in the About section).
+- **Run it locally:** Node 24, then `npm ci && npm start` and open http://localhost:3000. An empty
+  database seeds itself (`npm run seed -- --reset` rebuilds it). Locally there is no password: with no
+  `DEMO_PASSWORD` set, every visitor is the desk. Nothing touches the network unless sandbox keys are
+  in `.env`; without them the Fund button answers with a 503 page that explains what is missing.
 - **Start here:** `/` carries a five-link strip in the order the product decides them — `A-1043`
   (refused), `A-1043-R2` (the corrected document, priced), `A-1054` (the photograph the model read
   short, refused), `A-1042` (the clean twin, priced) and `NW-2277` (the small invoice the funding
@@ -486,11 +512,12 @@ chase a prize.
   from all three sides, because the view is a lens and a lens is for reading; the buttons follow the
   name, so a seller wearing the desk's view is told who holds that verb rather than handed a button
   that answers 403. A side can also be given its own password, which stops it accepting the shared one
-  and takes the role out of the hands of whoever is typing. Judges get the shared password — reading
-  every side is the point of a demo; pressing the loss side is not, and is not what is shown.
-- **Video:** the script and shot list are in [`VIDEO.md`](VIDEO.md) — under three minutes, no music,
-  no third-party marks, recorded from this build at 1440 px. Nothing in it is re-enacted: every page
-  it shows exists in the book.
+  and takes the role out of the hands of whoever is typing.
+- **Live demo:** {RENDER_URL} (Render free instance; the first load can take about a minute to wake).
+  Sign in as `desk`, `seller`, `funder` or `debtor`. The password is given in the Devpost
+  testing-instructions field; it is set as an environment variable on Render and is not in this repo.
+- **Video (voiced, captions, under three minutes):** {VIDEO_URL}. The shot list and narration are in
+  [`VIDEO.md`](VIDEO.md). Every page it shows exists in the seeded book.
 
 ## Submission assets
 

@@ -1,19 +1,25 @@
-# Render blueprint for The Discount Window.
+# Render Blueprint for The Discount Window (New > Blueprint > this repo).
 # The Docker image seeds itself on first start, so an ephemeral disk is honest here: every cold start
 # rebuilds the same synthetic book, and /status says the book is synthetic. A persistent disk is only
-# needed if live sandbox captures must survive a redeploy.
+# needed if live sandbox captures must survive a redeploy (not available on the free plan).
 services:
   - type: web
     name: the-discount-window
     runtime: docker
     plan: free
+    branch: improvement
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
       - key: PORT
         value: 3000
       - key: DB_PATH
         value: /app/data/discountwindow.sqlite
-      # One shared demo password; the username picks the role. Set it in the dashboard before deploy.
+      - key: PAYPAL_BASE
+        value: https://api-m.sandbox.paypal.com
+      # One shared demo password; the username picks the role. Render asks for it at Blueprint
+      # creation. Never commit it; hand it to judges in the Devpost testing-instructions field.
       - key: DEMO_PASSWORD
         sync: false
       # Sandbox keys are optional: without them the app runs fully offline and the Fund route
@@ -23,4 +29,14 @@ services:
       - key: PAYPAL_CLIENT_SECRET
         sync: false
       - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: PAYPAL_PLATFORM_MERCHANT_ID
+        sync: false
+      - key: PAYPAL_PLATFORM_EMAIL
+        sync: false
+      - key: PAYPAL_SELLER_EMAIL
+        sync: false
+      - key: PAYPAL_FUNDER_EMAIL
+        sync: false
+      - key: PAYPAL_DEBTOR_EMAIL
         sync: false

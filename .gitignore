@@ -20,3 +20,6 @@ Thumbs.db
 
 # Scratch: review briefs, generated fixtures, run logs
 temp/
+
+# Local submission kit (video, thumbnails, gallery): large media, kept out of git
+submission/

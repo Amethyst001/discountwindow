@@ -10,6 +10,31 @@ real orders, real captures, and a real signed delivery from PayPal's own webhook
 money. The one rail event the sandbox cannot produce, a buyer's dispute, is exercised by that signed
 sample and by tests, and is labelled as such wherever it appears.
 
+
+## In one minute
+
+**Who it's for:** funders and marketplaces that pay out early against export invoices, and the small
+exporters who wait 30 to 90 days to be paid by a foreign buyer.
+
+**The problem:** a funder who pays early is betting on documents. The bet goes wrong in three ways:
+goods never delivered, delivery signed for someone other than the buyer, or the same paperwork
+funded twice. Checking every document by hand doesn't scale, so small exporters mostly go unfunded.
+
+**What it does:** the seller uploads an invoice and its proof of delivery. AI readers extract the
+fields (two independent vision models for photographed documents), and eleven deterministic checks
+decide. Each invoice is either **refused with a reason the seller can fix**, or **priced** from the
+desk's own record with the debtor. The AI reads; the rules decide.
+
+**PayPal:** Orders v2 with multi-payee purchase units, so one funder approval pays the seller's advance
+and the platform's fee as separate captures and the platform never holds the money. Webhooks are
+signature-verified before they can freeze a position. Transaction Search reconciles the debtor's
+history behind `RAIL_HISTORY=1`.
+
+**Honest scope:** PayPal sandbox only, no real money. The book of 1,007 invoices (626 refused) is
+synthetic. 166 tests. No pilots or users yet.
+
+**Links:** Video {VIDEO_URL} · Live demo {RENDER_URL} · Repo https://github.com/Amethyst001/discountwindow
+
 ---
 
 ## The problem it solves
@@ -346,7 +371,7 @@ npm ci
 cp .env.example .env      # fill the PayPal sandbox credentials
 npm start                 # http://localhost:3000 — an empty database seeds itself
 npm run seed -- --reset   # rebuild the book from scratch
-npm test                  # 166 tests
+npm test                  # 166 tests, all offline
 ```
 
 The seed is deterministic: 1,000 synthetic invoices plus the pinned demo set, and **626 of the 1,007**
@@ -433,6 +458,16 @@ capture ids recorded in `evidence/published/x5-live-funding.json`. Nothing is in
 refuses to run if the evidence and the price disagree.
 
 ## Deploy
+
+**Render (the hosted demo):** `render.yaml` is a Render Blueprint. In the Render dashboard choose
+New > Blueprint, connect this repository, and set `DEMO_PASSWORD` when asked (sandbox `PAYPAL_*`
+values are optional). Render builds the Dockerfile on the free plan, health-checks `/health`, and the
+container seeds the synthetic book on its first start. Free instances sleep when idle, so the first
+request after a pause takes about a minute. The disk is not persistent on the free plan: a redeploy
+or restart rebuilds the same seeded book, and any sandbox captures made on the live demo are lost.
+Live demo: {RENDER_URL}
+
+**Any container host:**
 
 ```bash
 docker build -t discount-window .
