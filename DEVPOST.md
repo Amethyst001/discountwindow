@@ -22,9 +22,79 @@ signature-verified before they can freeze a position. Transaction Search reconci
 history behind `RAIL_HISTORY=1`.
 
 **Honest scope:** PayPal sandbox only, no real money. The book of 1,007 invoices (626 refused) is
-synthetic. 166 tests. No pilots or users yet.
+synthetic. 167 tests. No pilots or users yet.
 
 **Links:** Video {VIDEO_URL} · Live demo {RENDER_URL} · Repo https://github.com/Amethyst001/discountwindow
+
+## Judge in 3 clicks
+
+**Live demo:** {RENDER_URL}. Reading needs no password: the instance runs with `DEMO_PUBLIC_READ=1`, so a
+visitor is a read-only guest and no button is offered. The free instance sleeps when idle, so the first
+load can take about a minute.
+
+1. **{RENDER_URL}/n/A-1043:** a $48,000 invoice refused with `CONSIGNEE_MISMATCH`. The delivery was signed
+   for Halcyon Logistics; the debtor is Halcyon Retail Group. *Proves:* the gate refuses before any money
+   moves, with the rule, a fix the seller can act on, the document's hash and an audit row.
+2. **{RENDER_URL}/n/A-1054:** a phone photo of a proof of delivery, shown on the page. Two vision models
+   read the smudged tracking number as nine digits; FedEx numbers this desk accepts have 12, 15 or 20, so
+   a deterministic rule refuses it. *Proves:* the AI reads, the rules decide.
+3. **{RENDER_URL}/n/NW-2277?view=funder:** a $650 invoice priced at a $493.01 advance. Signed in as
+   `funder`, "Fund the seller's advance" creates one PayPal order with two payees (seller's advance and
+   platform fee). *Proves:* settlement where the platform never holds the seller's money.
+
+Also worth a click: **{RENDER_URL}/n/A-1043-R2** (the corrected document, priced at a $36,428.01 advance;
+the original stays refused) and **{RENDER_URL}/status** (audit chain re-checked, counts, webhook
+verdicts). Pressing Fund needs a sign-in (password in the Devpost testing instructions) and sandbox keys
+on the instance; without keys it answers with a page that says so. The recorded sandbox run of NW-2277
+(order and both capture ids) is in `evidence/published/x5-live-funding.json`.
+
+## PayPal APIs this code calls
+
+All calls go to `api-m.sandbox.paypal.com`; the client refuses any other host.
+
+| Endpoint | Called from | What for |
+|---|---|---|
+| `POST /v1/oauth2/token` | `src/paypal.ts` | Client-credentials access token |
+| `POST /v2/checkout/orders` | `src/store.ts` (funding and maturity) | One order with a purchase unit per payee: the seller's advance and the platform's fee at funding; the funder and the seller at maturity |
+| `GET /v2/checkout/orders/{id}` | `src/server.ts` | Confirms the payer approved the order before capture |
+| `POST /v2/checkout/orders/{id}/capture` | `src/store.ts` | Captures the approved order: one capture per purchase unit |
+| `POST /v1/notifications/verify-webhook-signature` | `src/server.ts` | Every webhook is verified before it may change state; a check that cannot be made answers 503 so PayPal retries |
+| `GET /v2/payments/captures/{id}` | `src/server.ts` | Debtor payment history from the desk's own captures (only with `RAIL_HISTORY=1`) |
+| `GET /v1/reporting/transactions` | `src/server.ts` | Transaction Search for older payments, settled (`S`) rows only (only with `RAIL_HISTORY=1`) |
+
+Used only by the sandbox experiment scripts in `scripts/`, not by the app: webhook registration
+(`/v1/notifications/webhooks`), the webhook simulator, the Disputes API, and one Payouts probe that the
+product deliberately does not use.
+
+## What the AI does, and what it does not
+
+- **Reader A** (any OpenAI-compatible model in `EXTRACT_*`; the recorded runs used `gemini-3.8-flash-free`):
+  for a PDF or text proof it extracts the fields with a confidence per field, as a second opinion beside
+  a deterministic label parser. For a photograph it also transcribes the page.
+- **Reader B** (`EXTRACT_B_*`; recorded runs used `nvidia/nemotron-3.5-super-vl-120b-a12b`): reads the same
+  photograph independently, with different weights.
+- **Reconciliation, not trust:** agreement keeps the higher confidence, a field only one reader found drops
+  to 0.75, and a disagreement is halved, which puts it under the 0.7 floor, so a split becomes a refusal.
+- **What decides:** the eleven checks in `rules/checks.yaml` and `rules/jurisdictions.yaml`. The models
+  never see the score, the price, the verdict or the payment.
+- **Without keys** the app runs on the deterministic parser alone. A-1054's two model reads are a recorded
+  run (`evidence/published/x11-degraded-read.json`) seeded into the book.
+
+## Limitations
+
+- **Sandbox only:** no real money moves, and the client will not talk to a production host.
+- **Synthetic book:** the 1,007 invoices and the worked examples are generated; none is a real trade.
+- **No users yet:** no pilots, partners or customers. It has not been tested on a real exporter's
+  paperwork, and not with a Paga-linked PayPal account.
+- **Platform account:** PayPal's multi-payee orders need a US business account as the platform; a
+  Nigerian business account was refused at checkout (`PAYEE_ACCOUNT_LOCKED_OR_CLOSED`, measured).
+- **Checks read formats, not carriers:** a tracking number is checked against the carrier's published
+  format; the carrier is not queried.
+- **One currency (USD).** No FX policy is modelled.
+- **Hosted demo:** the free Render instance sleeps when idle, and a restart rebuilds the same seeded book,
+  so anything done on the live demo is temporary. The shared demo password is a gate, not access control.
+- **Notice of assignment:** the desk produces and keeps the notice; it cannot prove the notice was lawfully
+  served.
 
 ---
 
@@ -459,7 +529,7 @@ agent reads exactly what a human reviewer reads.
 ## Built during the submission period
 
 Everything here was written for this event: the gate, the scorecard, the pricing, the PayPal client,
-the ledger, the pages, the dataset generator, the API contract and the tests. **166 tests, all passing and offline**
+the ledger, the pages, the dataset generator, the API contract and the tests. **167 tests, all passing and offline**
 (no network or keys needed), via `npm test` — and one of them boots the real server on a local port and goes through the routes
 rather than the functions under them: 401 for a username that is not one of the four, 401 when a side
 holding its own secret is offered the shared one, 403 when a seller POSTs a fund, 503 when a fund press
