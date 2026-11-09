@@ -1,62 +1,25 @@
-# Video script — under 3:00
+# Video — The Discount Window (2:30)
 
-**A finished cut exists:** [`video/the-discount-window-demo.mp4`](video/the-discount-window-demo.mp4) —
-1:24, 1440×900, 25 fps, silent with burned-in captions, built from headless 1440px renders of the real
-seeded pages (no re-enactment; every frame is the app). The NW-2277 funding beat uses the honest replay
-caption pointing at `evidence/published/x5-live-funding.json`, exactly as the fallback below prescribes.
-A voice-over re-record on the same beat table is still the stronger cut — the script and timings below
-are the voice version.
+**The cut:** {VIDEO_URL} (YouTube). 1920×1080, 30 fps, AI-voiced narration (Microsoft Edge neural
+voice *en-US-AndrewNeural*), burned-in captions. Every app frame is a screenshot of the current UI
+from a freshly seeded book. The NW-2277 funding was a real PayPal sandbox run on 9 Nov 2026 (order
+`4YS26797M70171205`, captures `6MS23921KE968515G` and `95J03288VS642621Y`); no real money moved.
+The A-1054 readings are the recorded two-reader run in `evidence/published/x11-degraded-read.json`
+(Gemini and NVIDIA Nemotron both returned `120098780`), replayed by the seed rather than called live.
+The exporter in Aba is illustrative, not a customer. The media file is not committed; it is uploaded
+to YouTube and Devpost.
 
-One take, one screen, no music, no third-party marks, 1440 px wide at 100% zoom, cursor visible.
-Every page shown exists in the seeded book. One beat can be live: the **NW-2277 funding in PayPal's
-sandbox**. If the funder login is not ready, that same beat uses the committed capture ids in
-`evidence/published/x5-live-funding.json`, on screen as **sandbox replay — recorded 31 Oct 2026**, and
-the voice says "recorded earlier in this sandbox" — never "live".
-
-**Before recording**
-
-1. `npm start`. Open `/` and use the Start-here strip; do not type invoice ids, they contain the seed
-   hash and change on reseed.
-2. Tabs, left to right: `/` (Start here), **A-1043**, **A-1043-R2**, **A-1054**, **A-1042**,
-   **NW-2277**, `/status`.
-3. Check each tab before the take:
-   - A-1043: **Refused**, `CONSIGNEE_MISMATCH`, "Consignee \"Halcyon Logistics\" does not match the
-     debtor \"Halcyon Retail Group\"."
-   - A-1043-R2: "Corrected submission of A-1043", **priced**, advance **$36,428.01**.
-   - A-1054: the photograph's SHA-256 starting `6d16bba…`, both readers named, tracking field at
-     **75%**, refusal "120098780 is not a well-formed FedEx tracking number".
-   - A-1042: **priced**, score **78**, band **B**, rate **14.0%**, advance **$36,428.01**.
-   - NW-2277: the funder sees a Fund button; the screen shows the $650 face and $493.01 advance.
-4. Sign in as `funder` in a second window and log into the sandbox buyer account, so the approval is
-   one click. Do not show the password field.
-5. Dry run with a stopwatch. If the funding approval is not on screen by 1:24, switch to the replay
-   card before recording — do not improvise it on the take.
-
-| t | On screen | Voice |
+| t | On screen | Narration |
 |---|---|---|
-| 0:00 | A-1043 refusal card: $48,000, `CONSIGNEE_MISMATCH` | "Forty-eight thousand dollars, refused before funding. The delivery was signed for Halcyon Logistics; the debtor is Halcyon Retail Group." |
-| 0:10 | The document, the consignee boxed beside the debtor name | "One line is enough. The parcel is real; the paper names the wrong company." |
-| 0:18 | Audit rows: extraction, gate, refusal, each hashed | "The refusal is hashed into the chain — and it is not a dead end." |
-| 0:24 | A-1043-R2, "Corrected submission of A-1043" | "The seller uploads the corrected proof. Same forty-eight thousand, same purchase order — a revision, not an edit." |
-| 0:34 | A-1043-R2 priced: advance $36,428.01 | "It passes the same eleven checks and prices at thirty-six thousand, four hundred and twenty-eight dollars. The refused original stays refused." |
-| 0:44 | A-1054, the model card: two readers, tracking at 75% | "This one arrived as a photograph. Two vision models read the smudged tracking number as nine digits; the parser found nothing under the smudge. Reconciled confidence: seventy-five per cent." |
-| 0:58 | A-1054 refusal sentence | "Above the floor, and still refused — a FedEx number is twelve digits, not nine. The AI is allowed to speak; it is not allowed to decide." |
-| 1:08 | A-1042 priced: 78, band B, 14.0%, $36,428.01 | "The clean twin of the refused invoice: same seller, same face, same purchase order. The score is this desk's own record with the debtor, not a bureau." |
-| 1:22 | NW-2277 Fund → PayPal approval → capture | "The funder approves one order. One capture call, a capture per payee: the seller's advance and the platform's fee. This is PayPal's sandbox; no real money moves." |
-| 1:42 | NW-2277 after capture, the two units and their capture ids | "Two purchase units, two accounts, one payment. The platform never holds the balance." |
-| 1:50 | `/status` | "The book proves itself with no login: one thousand and seven invoices, six hundred and twenty-six refused; the audit chain re-walked and intact. The ledger appears only when money moves. And the webhook count is split — signature-verified events that may act, stored-unverified bodies that may not." |
-| 2:10 | Final card | "Refusals are the product. Not escrow, not a lender, not a marketplace. Sandbox only." |
-
-**Do not say**
-
-- "Escrow", "we hold the money", "guaranteed", "protected by PayPal" — the build takes no custody and
-  the sandbox returns no protection status.
-- "The AI disagreed" — on A-1054 both readers returned the same nine digits; the refusal is E02's
-  deterministic length rule, not a split.
-- "Customer", "pilot" or "live business" about any seeded invoice — the book is synthetic and says so.
-- "Live" over the replay card, or over any capture already recorded.
-- Any number that is not on screen at that moment. Read the counts from `/status`.
-
-**Timing budget:** 2:18 scripted, 2:30 ceiling. If the dry run breaks it, cut in this order: the
-after-capture units sentence (1:42), then the audit-row beat (0:18) — never the A-1054 refusal, the
-A-1042 price or the funding itself.
+| 0:00 | Title card | Funders pay exporters early against invoices, but only if the paperwork is true. The Discount Window checks the paper first, and refuses what doesn't hold, before any money moves. |
+| 0:11 | The funder's risk card (illustrative exporter) | An early payment is a bet on documents: goods never delivered, a delivery signed for someone else, the same invoice funded twice. Checking by hand doesn't scale, so small exporters, say, a parts maker in Aba waiting sixty days for a buyer in Texas, mostly go unfunded. |
+| 0:28 | The book, guest view, Start-here examples | This is the desk, on a synthetic book of one thousand and seven invoices. Judges can read the book and every invoice without a password. |
+| 0:36 | A-1043 refusal card, then the proof of delivery with the failing line marked | A ten forty-three, forty-eight thousand dollars. The delivery was signed for Halcyon Logistics, but the debtor is Halcyon Retail Group. Refused, with the rule, a fix the seller can act on, and the line of the document that failed. |
+| 0:49 | A-1043-R2, priced | The seller files the corrected proof as a new revision. It clears the eleven checks and prices at a thirty-six thousand, four hundred and twenty-eight dollar advance. The original refusal stands. |
+| 1:00 | A-1054: verdict, the photograph, the two readers' recorded answers | A ten fifty-four arrived as a phone photo with a smudged tracking number. In a recorded run, two vision models, Gemini and NVIDIA Nemotron, read it independently, and both returned the same nine digits. This desk's FedEx rule accepts twelve, fifteen or twenty, so the rule refuses it. The AI reads. It never decides. |
+| 1:20 | NW-2277 funder view: position card beside Fund | On the funder's view, the position sits next to the button: commit four ninety-three oh one; at maturity, if the debtor pays, $504.62 comes back. Fund creates one PayPal Orders v2 order with two purchase units: the seller's advance and the platform's fee. |
+| 1:38 | PayPal sandbox checkout (real sandbox run, 9 Nov 2026) | The funder approves once, in PayPal's sandbox checkout. This is a real sandbox run; no real money moves. |
+| 1:45 | NW-2277 captured, then the balanced settlement book | The capture settles each payee directly: four eighty-nine seventy-six to the seller, three twenty-five to the platform. The platform never holds the money, and the settlement book balances to the cent. |
+| 1:56 | /status tiles, then refusals by reason | Webhooks change a position only after PayPal verifies the signature. With no login, the status page shows the counts and an intact audit chain, and every refusal is listed with its reason. |
+| 2:07 | Honest scope card | Today this is a sandbox prototype: synthetic invoices, one hundred and seventy-five passing tests, and no pilots or users yet. In the sandbox, PayPal's seller-protection check is overridden, and the page says so. Next is real, redacted paperwork from Nigerian exporters. |
+| 2:24 | End card with the live URL and repo | The AI reads. The rules decide. Every refusal has a reason. |

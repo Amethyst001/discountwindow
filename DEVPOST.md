@@ -22,30 +22,30 @@ signature-verified before they can freeze a position. Transaction Search reconci
 history behind `RAIL_HISTORY=1`.
 
 **Honest scope:** PayPal sandbox only, no real money. The book of 1,007 invoices (626 refused) is
-synthetic. 167 tests. No pilots or users yet.
+synthetic. 175 tests. No pilots or users yet.
 
-**Links:** Video {VIDEO_URL} · Live demo {RENDER_URL} · Repo https://github.com/Amethyst001/discountwindow
+**Links:** Video {VIDEO_URL} · Live demo https://the-discount-window.onrender.com · Repo https://github.com/Amethyst001/discountwindow
 
 ## Judge in 3 clicks
 
-**Live demo:** {RENDER_URL}. Reading needs no password: the instance runs with `DEMO_PUBLIC_READ=1`, so a
+**Live demo:** https://the-discount-window.onrender.com. Reading needs no password: the instance runs with `DEMO_PUBLIC_READ=1`, so a
 visitor is a read-only guest and the action buttons are shown switched off. The free instance sleeps when idle, so the first
 load can take about a minute.
 
-1. **{RENDER_URL}/n/A-1043:** a $48,000 invoice refused with `CONSIGNEE_MISMATCH`. The delivery was signed
+1. **https://the-discount-window.onrender.com/n/A-1043:** a $48,000 invoice refused with `CONSIGNEE_MISMATCH`. The delivery was signed
    for Halcyon Logistics; the debtor is Halcyon Retail Group. *Proves:* the gate refuses before any money
    moves, with the rule, a fix the seller can act on, the document's hash and an audit row.
-2. **{RENDER_URL}/n/A-1054:** a phone photo of a proof of delivery, shown on the page. Two vision models
+2. **https://the-discount-window.onrender.com/n/A-1054:** a phone photo of a proof of delivery, shown on the page. Two vision models
    read the smudged tracking number as nine digits; FedEx numbers this desk accepts have 12, 15 or 20, so
    a deterministic rule refuses it. *Proves:* the AI reads, the rules decide.
-3. **{RENDER_URL}/n/NW-2277?view=funder:** a $650 invoice priced at a $493.01 advance. Signed in as
+3. **https://the-discount-window.onrender.com/n/NW-2277?view=funder:** a $650 invoice priced at a $493.01 advance. Signed in as
    `funder`, "Fund the seller's advance" creates one PayPal order with two payees (seller's advance and
    platform fee). *Proves:* settlement where the platform never holds the seller's money.
 
-Also worth a click: **{RENDER_URL}/n/A-1043-R2** (the corrected document, priced at a $36,428.01 advance;
-the original stays refused) and **{RENDER_URL}/status** (audit chain re-checked, counts, webhook
-verdicts). Pressing Fund needs a sign-in (password in the Devpost testing instructions) and sandbox keys
-on the instance; without keys it answers with a page that says so. The recorded sandbox run of NW-2277
+Also worth a click: **https://the-discount-window.onrender.com/n/A-1043-R2** (the corrected document, priced at a $36,428.01 advance;
+the original stays refused) and **https://the-discount-window.onrender.com/status** (audit chain re-checked, counts, webhook
+verdicts). Pressing Fund needs a sign-in (password in the Devpost testing instructions); the hosted instance
+carries sandbox keys, so a signed-in funder can run the PayPal sandbox checkout end to end. The recorded sandbox run of NW-2277
 (order and both capture ids) is in `evidence/published/x5-live-funding.json`.
 
 ## PayPal APIs this code calls
@@ -103,7 +103,7 @@ Logistics**, and the debtor is **Halcyon Retail Group**. The seller sends the co
 as **A-1043-R2** — same face, same purchase order, a new revision number — and it passes the same
 eleven checks and prices at a **$36,428.01** advance. A third invoice, **A-1054**, arrives as a
 photograph; both vision readers return the same nine-digit tracking number, reconciled at 0.75
-confidence, and the deterministic check refuses it outright because a FedEx number is twelve digits.
+confidence, and the deterministic check refuses it outright because a FedEx number this desk accepts has twelve, fifteen or twenty digits.
 **A-1042**, the clean twin of the refused invoice, is priced on the same terms. Funding is exercised in
 PayPal's **sandbox**: one order, one capture call, a capture per payee, with the capture ids in the
 repo. The refusal and the price sit on the same page, with the document, its SHA-256 and the reason.
@@ -529,7 +529,7 @@ agent reads exactly what a human reviewer reads.
 ## Built during the submission period
 
 Everything here was written for this event: the gate, the scorecard, the pricing, the PayPal client,
-the ledger, the pages, the dataset generator, the API contract and the tests. **167 tests, all passing and offline**
+the ledger, the pages, the dataset generator, the API contract and the tests. **175 tests, all passing and offline**
 (no network or keys needed), via `npm test` — and one of them boots the real server on a local port and goes through the routes
 rather than the functions under them: 401 for a username that is not one of the four, 401 when a side
 holding its own secret is offered the shared one, 403 when a seller POSTs a fund, 503 when a fund press
@@ -583,7 +583,7 @@ chase a prize.
   name, so a seller wearing the desk's view is told who holds that verb rather than handed a button
   that answers 403. A side can also be given its own password, which stops it accepting the shared one
   and takes the role out of the hands of whoever is typing.
-- **Live demo:** {RENDER_URL} (Render free instance; the first load can take about a minute to wake).
+- **Live demo:** https://the-discount-window.onrender.com (Render free instance; the first load can take about a minute to wake).
   Sign in as `desk`, `seller`, `funder` or `debtor`. The password is given in the Devpost
   testing-instructions field; it is set as an environment variable on Render and is not in this repo.
 - **Video (voiced, captions, under three minutes):** {VIDEO_URL}. The shot list and narration are in
@@ -594,11 +594,14 @@ chase a prize.
 All brand pieces come from this build's own palette (`src/html.ts`: paper `#f4efe4`, ink `#191712`,
 oxblood `#78211f`) — no third-party marks anywhere in the pack.
 
-- **Thumbnail and video frame:** `brand/05_thumbnail.jpg` — 1280×720, the wordmark and tagline on the
-  left, one invoice carrying a single REFUSED verdict with its reason on the right. Lead image for the
-  gallery and the YouTube thumbnail.
-- **Gallery:** `brand/03_palette_type.png` (colour and type sheet rendered from the app's CSS) and
-  `brand/01_logo_primary.jpg`.
+- **Video:** {VIDEO_URL} — 2:30, 1920×1080, AI-voiced narration with burned-in captions, shot from the
+  current UI, including a PayPal sandbox funding of NW-2277 recorded on 9 Nov 2026.
+- **Thumbnail:** `submission/youtube/thumbnail_1280x720.png` (master `thumbnail_2560x1440.png`), real
+  A-1043 refusal from the app on the right.
+- **Gallery:** eight 1800×1200 frames in `submission/gallery/`, each a real screenshot of the current
+  UI with a caption band: the A-1043 refusal, the two AI readers on A-1054, the corrected A-1043-R2,
+  the funder view of NW-2277, the PayPal sandbox approval, the balanced settlement book, the refusals by
+  reason, and the phone layout. (`submission/` is kept out of git; the media are uploaded to Devpost.)
 - **In-app:** the app serves its own favicon from `/favicon.ico` (`brand/`, recoloured to the app's
   ink), and the invoice card on the banner carries A-1043's real refusal — `CONSIGNEE MISMATCH`,
   $48,000, Northwind Components Ltd — the same numbers the Start-here strip opens on. One invoice,

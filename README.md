@@ -31,30 +31,30 @@ signature-verified before they can freeze a position. Transaction Search reconci
 history behind `RAIL_HISTORY=1`.
 
 **Honest scope:** PayPal sandbox only, no real money. The book of 1,007 invoices (626 refused) is
-synthetic. 167 tests. No pilots or users yet.
+synthetic. 175 tests. No pilots or users yet.
 
-**Links:** Video {VIDEO_URL} · Live demo {RENDER_URL} · Repo https://github.com/Amethyst001/discountwindow
+**Links:** Video {VIDEO_URL} · Live demo https://the-discount-window.onrender.com · Repo https://github.com/Amethyst001/discountwindow
 
 ## Judge in 3 clicks
 
-**Live demo:** {RENDER_URL}. Reading needs no password: the instance runs with `DEMO_PUBLIC_READ=1`, so a
+**Live demo:** https://the-discount-window.onrender.com. Reading needs no password: the instance runs with `DEMO_PUBLIC_READ=1`, so a
 visitor is a read-only guest and the action buttons are shown switched off. The free instance sleeps when idle, so the first
 load can take about a minute.
 
-1. **{RENDER_URL}/n/A-1043:** a $48,000 invoice refused with `CONSIGNEE_MISMATCH`. The delivery was signed
+1. **https://the-discount-window.onrender.com/n/A-1043:** a $48,000 invoice refused with `CONSIGNEE_MISMATCH`. The delivery was signed
    for Halcyon Logistics; the debtor is Halcyon Retail Group. *Proves:* the gate refuses before any money
    moves, with the rule, a fix the seller can act on, the document's hash and an audit row.
-2. **{RENDER_URL}/n/A-1054:** a phone photo of a proof of delivery, shown on the page. Two vision models
+2. **https://the-discount-window.onrender.com/n/A-1054:** a phone photo of a proof of delivery, shown on the page. Two vision models
    read the smudged tracking number as nine digits; FedEx numbers this desk accepts have 12, 15 or 20, so
    a deterministic rule refuses it. *Proves:* the AI reads, the rules decide.
-3. **{RENDER_URL}/n/NW-2277?view=funder:** a $650 invoice priced at a $493.01 advance. Signed in as
+3. **https://the-discount-window.onrender.com/n/NW-2277?view=funder:** a $650 invoice priced at a $493.01 advance. Signed in as
    `funder`, "Fund the seller's advance" creates one PayPal order with two payees (seller's advance and
    platform fee). *Proves:* settlement where the platform never holds the seller's money.
 
-Also worth a click: **{RENDER_URL}/n/A-1043-R2** (the corrected document, priced at a $36,428.01 advance;
-the original stays refused) and **{RENDER_URL}/status** (audit chain re-checked, counts, webhook
-verdicts). Pressing Fund needs a sign-in (password in the Devpost testing instructions) and sandbox keys
-on the instance; without keys it answers with a page that says so. The recorded sandbox run of NW-2277
+Also worth a click: **https://the-discount-window.onrender.com/n/A-1043-R2** (the corrected document, priced at a $36,428.01 advance;
+the original stays refused) and **https://the-discount-window.onrender.com/status** (audit chain re-checked, counts, webhook
+verdicts). Pressing Fund needs a sign-in (password in the Devpost testing instructions); the hosted instance
+carries sandbox keys, so a signed-in funder can run the PayPal sandbox checkout end to end. The recorded sandbox run of NW-2277
 (order and both capture ids) is in `evidence/published/x5-live-funding.json`.
 
 ## PayPal APIs this code calls
@@ -441,7 +441,7 @@ npm ci
 cp .env.example .env      # fill the PayPal sandbox credentials
 npm start                 # http://localhost:3000 — an empty database seeds itself
 npm run seed -- --reset   # rebuild the book from scratch
-npm test                  # 167 tests, all offline
+npm test                  # 175 tests, all offline
 ```
 
 The seed is deterministic: 1,000 synthetic invoices plus the pinned demo set, and **626 of the 1,007**
@@ -535,7 +535,7 @@ values are optional). Render builds the Dockerfile on the free plan, health-chec
 container seeds the synthetic book on its first start. Free instances sleep when idle, so the first
 request after a pause takes about a minute. The disk is not persistent on the free plan: a redeploy
 or restart rebuilds the same seeded book, and any sandbox captures made on the live demo are lost.
-Live demo: {RENDER_URL}
+Live demo: https://the-discount-window.onrender.com
 
 **Any container host:**
 
@@ -572,7 +572,7 @@ app an HTTPS URL will do; a Cloudflare quick tunnel is enough for sandbox webhoo
 src/        server, router, HTML, gate, price, score, ledger, audit, PayPal client, seed
 rules/      checks.yaml — the eleven checks; jurisdictions.yaml — the per-country numbers they read
 scripts/    sandbox experiments (orders, multi-payee, webhooks, dispute attempt, approvals) and fixtures
-tests/      167 tests: money, gate, price, ledger balance, settlement split, webhook attribution and
+tests/      175 tests: money, gate, price, ledger balance, settlement split, webhook attribution and
             retry rules, rail reconciliation, capture-first history, reader reconciliation,
             jurisdiction portability, default & recourse lifecycle, assignment notice integrity,
             offline funding preflight, sandbox host guard
