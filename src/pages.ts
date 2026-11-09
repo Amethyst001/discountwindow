@@ -100,7 +100,7 @@ export function renderBook(
   const money = (v: any) => `<td class="r num">${v == null ? '<span class="muted">—</span>' : formatCents(Number(v))}</td>`;
 
   let heading = 'The book';
-  let lede = 'Every invoice on this desk, and what happened to it. Nothing is listed until delivery evidence is verified.';
+  let lede = 'For funders who pay exporters early against their invoices: every invoice here was checked against its proof of delivery before anyone could fund it. Refused paper says why and what the seller can fix; verified paper is priced. Nothing is listed until delivery evidence is verified.';
   let cards = `<div class="grid cols-3 stat-cards" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 28px;">
     <div class="card"><h3>Invoices</h3><div class="num" style="font-size:1.75rem">${counts.total.toLocaleString('en-US')}</div></div>
     <div class="card"><h3>Refused</h3><div class="num" style="font-size:1.75rem;color:var(--oxblood)">${counts.refused.toLocaleString('en-US')}</div></div>
