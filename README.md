@@ -33,7 +33,7 @@ history behind `RAIL_HISTORY=1`.
 **Honest scope:** PayPal sandbox only, no real money. The book of 1,007 invoices (626 refused) is
 synthetic. 175 tests. No pilots or users yet.
 
-**Links:** Video {VIDEO_URL} · Live demo https://the-discount-window.onrender.com · Repo https://github.com/Amethyst001/discountwindow
+**Links:** Video https://youtu.be/-HJIya-tfdU · Live demo https://the-discount-window.onrender.com · Repo https://github.com/Amethyst001/discountwindow
 
 ## Judge in 3 clicks
 
