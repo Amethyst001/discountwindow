@@ -764,7 +764,8 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
 
   const evidenceSection = `<section>
       <h3>The evidence</h3>
-      ${detail.evidence ? `<div class="doc">${highlightDocument(rawText.slice(0, 4000), highlightWords)}</div>
+      ${detail.evidence ? `${/^image\/(jpeg|png)$/.test(String(detail.evidence.mime)) ? `<figure class="evidence-photo"><a href="/invoices/${esc(invoice.id)}/evidence"><img src="/invoices/${esc(invoice.id)}/evidence" alt="The photographed proof of delivery for ${esc(invoice.invoice_number)}, as the readers received it" loading="lazy"></a><figcaption class="small muted">The photograph as filed${rawText.trim() ? '. The text below is what the readers transcribed from it' : ''}.</figcaption></figure>` : ''}
+      ${rawText.trim() ? `<div class="doc">${highlightDocument(rawText.slice(0, 4000), highlightWords)}</div>` : ''}
       ${highlightWords.length ? `<p class="small muted" style="margin:8px 0 0">Marked in the document: ${disagreementMarks.length ? 'what the two readers could not agree on' : 'the field a check failed on'}${disagreementMarks.length && failing.length ? ', and the field a check failed on' : ''}.</p>` : ''}
       <p class="small muted" style="margin-top:10px">SHA-256 <span class="hash">${esc(detail.evidence?.sha256?.slice(0, 32) ?? '')}…</span></p>`
         : `<p class="small">${esc(reusedEvidenceNote)}</p>`}

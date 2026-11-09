@@ -374,6 +374,11 @@ test('DEMO_PUBLIC_READ lets a guest read the book and the deal rooms, and press 
     const refused = await (await get(`/invoices/${book.refusedId}`)).text();
     assert.doesNotMatch(refused, /action="\/invoices\/[A-Za-z0-9_]+\/resubmit"/, 'no upload form for a guest');
     assert.equal((await get('/archive')).status, 200);
+    // Stable links by invoice number land on the deal room, for a guest too.
+    const byNumber = await fetch(`${BASE}/n/H-1`, { redirect: 'manual' });
+    assert.equal(byNumber.status, 303);
+    assert.match(byNumber.headers.get('location') ?? '', /^\/invoices\/[A-Za-z0-9_]+$/);
+    assert.equal((await fetch(`${BASE}/n/NOPE-404`, { redirect: 'manual' })).status, 404);
     assert.equal((await get('/ledger')).status, 200);
     // Everything that writes, uploads or reads the machine surface stays behind the password.
     assert.equal((await get('/submit')).status, 401);
@@ -385,6 +390,19 @@ test('DEMO_PUBLIC_READ lets a guest read the book and the deal rooms, and press 
     assert.equal((await get('/', 'funder:wrong')).status, 401);
     const signedIn = await get('/login', `funder:${SHARED}`);
     assert.equal(signedIn.status, 200, 'after sign-in /login lands back on the book');
+
+    // A text proof has no photograph to serve; a photograph is served from evidence/published; and a
+    // row pointing outside the two evidence roots is not served, whatever its mime says.
+    assert.equal((await get(`/invoices/${book.pricedId}/evidence`)).status, 404);
+    const db = openDb(DB_PATH);
+    db.prepare("UPDATE evidence_files SET path = 'evidence/published/x11-degraded-scan.jpg', mime = 'image/jpeg' WHERE invoice_id = ?").run(book.fundedId);
+    db.prepare("UPDATE evidence_files SET path = '../package.json', mime = 'image/jpeg' WHERE invoice_id = ?").run(book.refusedId);
+    db.close();
+    const photo = await get(`/invoices/${book.fundedId}/evidence`);
+    assert.equal(photo.status, 200);
+    assert.equal(photo.headers.get('content-type'), 'image/jpeg');
+    assert.match(await (await get(`/invoices/${book.fundedId}`)).text(), /<img src="\/invoices\/[A-Za-z0-9_]+\/evidence"/);
+    assert.equal((await get(`/invoices/${book.refusedId}/evidence`)).status, 404, 'no path outside the evidence roots');
   } finally {
     await stop();
   }

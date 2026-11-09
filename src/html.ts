@@ -113,6 +113,10 @@ button:hover { background: #2b2823; }
 button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--ink); box-shadow: none; }
 .code-chip { font-family: var(--mono); font-size: 0.75rem; border: 1px solid var(--oxblood); color: var(--oxblood); padding: 2px 8px; display: inline-block; }
 .doc { border: 1px solid var(--rule); background: #fffdf7; padding: 20px 22px; font-family: var(--mono); font-size: 0.75rem; line-height: 1.9; white-space: pre-wrap; word-break: break-word; }
+.evidence-photo { margin: 0 0 12px; }
+.evidence-photo img { display: block; max-width: 100%; height: auto; border: 1px solid var(--rule); background: #fffdf7; }
+.evidence-photo a { border: 0; }
+.evidence-photo figcaption { margin-top: 6px; }
 .doc mark { background: #f2d9d6; color: var(--oxblood); padding: 0 2px; }
 .doc .hl { background: #e9dfc2; }
 tr.diff td { background: #fbf3ef; }

@@ -34,8 +34,8 @@ export function roleAllows(role: Role | 'guest', verb: string): boolean {
  */
 export function isPublicReadPath(method: string | undefined, path: string): boolean {
   if (method !== 'GET') return false;
-  return path === '/' || path === '/archive' || path === '/ledger'
-    || /^\/invoices\/[A-Za-z0-9_]+$/.test(path) || /^\/invoices\/[A-Za-z0-9_]+\/notice$/.test(path);
+  return path === '/' || path === '/archive' || path === '/ledger' || /^\/n\/[A-Za-z0-9-]{1,40}$/.test(path)
+    || /^\/invoices\/[A-Za-z0-9_]+$/.test(path) || /^\/invoices\/[A-Za-z0-9_]+\/(notice|evidence)$/.test(path);
 }
 
 /**

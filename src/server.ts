@@ -254,6 +254,21 @@ function forbidden(identity: Identity, verb: string): string {
     <p><a href="/">Back to the book</a></p>`;
 }
 
+/**
+ * Resolves an invoice's evidence to a readable image file, or null. The stored path is resolved and
+ * must sit inside evidence/published (the seeded examples) or the configured evidence directory
+ * (uploads), so a row can never be made to serve an arbitrary file from the disk.
+ */
+export function evidenceImageFile(db: ReturnType<typeof openDb>, invoiceId: string): { path: string; mime: string } | null {
+  const row = db.prepare('SELECT path, mime FROM evidence_files WHERE invoice_id = ?').get(invoiceId) as any;
+  if (!row || !/^image\/(jpeg|png)$/.test(String(row.mime))) return null;
+  const resolved = nodePath.resolve(ROOT, String(row.path));
+  const roots = [nodePath.resolve(ROOT, 'evidence', 'published'), nodePath.resolve(config.evidenceDir)];
+  if (!roots.some((r) => resolved.startsWith(r + nodePath.sep))) return null;
+  if (!fs.existsSync(resolved)) return null;
+  return { path: resolved, mime: String(row.mime) };
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
   const path = url.pathname.replace(/\/+$/, '') || '/';
@@ -456,6 +471,25 @@ const server = http.createServer(async (req, res) => {
       const detail = invoiceDetail(db, detailMatch[1]);
       if (!detail) return send(res, 404, 'Not found', 'text/plain');
       return send(res, 200, renderDealRoom(detail, isSandbox(), view, identity));
+    }
+    // The photographed proof of delivery itself, so a reader can hold the page's verdict against the
+    // pixels the models read. Images only, and only from the two places evidence is ever written.
+    // A stable link by invoice number (/n/A-1043), so the README and the judges' instructions do not
+    // depend on the generated invoice ids. Unknown numbers are a 404, not a guess.
+    const numberMatch = /^\/n\/([A-Za-z0-9-]{1,40})$/.exec(path);
+    if (req.method === 'GET' && numberMatch) {
+      const row = db.prepare('SELECT id FROM invoices WHERE invoice_number = ? ORDER BY created_at LIMIT 1').get(numberMatch[1]) as any;
+      if (!row) return send(res, 404, 'No invoice with that number is on this desk.', 'text/plain');
+      const lens = url.searchParams.get('view');
+      res.writeHead(303, { Location: `/invoices/${row.id}${lens === 'seller' || lens === 'funder' || lens === 'desk' ? `?view=${lens}` : ''}` });
+      return res.end();
+    }
+    const evidenceMatch = /^\/invoices\/([A-Za-z0-9_]+)\/evidence$/.exec(path);
+    if (req.method === 'GET' && evidenceMatch) {
+      const file = evidenceImageFile(db, evidenceMatch[1]);
+      if (!file) return send(res, 404, 'No photographed evidence is filed against this invoice.', 'text/plain');
+      res.writeHead(200, { 'Content-Type': file.mime, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+      return res.end(fs.readFileSync(file.path));
     }
     const noticeMatch = /^\/invoices\/([A-Za-z0-9_]+)\/notice$/.exec(path);
     if (req.method === 'GET' && noticeMatch) {
