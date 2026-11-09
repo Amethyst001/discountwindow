@@ -36,6 +36,8 @@ export const config = {
   port: Number(read('PORT', '3000')),
   // One shared password in front of a public demo URL. Empty means open, which is for localhost.
   demoPassword: read('DEMO_PASSWORD'),
+  // '1' lets anyone GET the book and the deal rooms read-only, with no button offered (see auth.ts).
+  publicRead: read('DEMO_PUBLIC_READ') === '1',
   // The shared password admits anyone to the demo, and the username then picks the role — which means
   // the holder of that one password can also type `desk` and hold every button. Where a per-side
   // secret is set, it replaces the shared one for that side, and the role stops being self-declared.

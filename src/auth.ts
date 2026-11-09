@@ -21,8 +21,21 @@ const MAY: Record<Role, string[]> = {
   debtor: ['settle']
 };
 
-export function roleAllows(role: Role, verb: string): boolean {
-  return MAY[role].includes(verb);
+export function roleAllows(role: Role | 'guest', verb: string): boolean {
+  // A read-only guest (DEMO_PUBLIC_READ=1) holds no verb at all.
+  return (MAY[role as Role] ?? []).includes(verb);
+}
+
+/**
+ * The pages a read-only guest may GET without a password when DEMO_PUBLIC_READ=1: the book, an
+ * invoice's deal room, its notice, the refusals archive and the settlement book. Every POST, the
+ * API, the submit form and the desk's register stay behind the password, so a public link can show
+ * the worked examples without handing anyone a button that moves money or changes the book.
+ */
+export function isPublicReadPath(method: string | undefined, path: string): boolean {
+  if (method !== 'GET') return false;
+  return path === '/' || path === '/archive' || path === '/ledger'
+    || /^\/invoices\/[A-Za-z0-9_]+$/.test(path) || /^\/invoices\/[A-Za-z0-9_]+\/notice$/.test(path);
 }
 
 /**
@@ -35,7 +48,7 @@ export function holdersOf(verb: string): Role[] {
 }
 
 export interface Identity {
-  role: Role;
+  role: Role | 'guest';
   name: string;
 }
 

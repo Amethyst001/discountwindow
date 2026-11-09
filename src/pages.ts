@@ -18,7 +18,7 @@ function statusClass(status: string): string {
 export type View = 'desk' | 'seller' | 'funder';
 
 export interface Identity {
-  role: 'desk' | 'seller' | 'funder' | 'debtor';
+  role: 'desk' | 'seller' | 'funder' | 'debtor' | 'guest';
   name: string;
 }
 
@@ -37,6 +37,9 @@ function roleStrip(basePath: string, view: View, identity?: { role: string; name
     const href = `${basePath}${basePath.includes('?') ? '&' : '?'}view=${id}`;
     return `<a href="${href}"${view === id ? ' class="on"' : ''}>${label}</a>`;
   };
+  if (identity?.role === 'guest') {
+    return `<div class="role-strip"><span><strong>Read-only guest.</strong> Every page is readable; no button is offered. <a href="/login">Sign in</a> as desk, seller, funder or debtor to act.</span> Viewing as ${link('desk', 'Desk')}${link('seller', 'Seller')}${link('funder', 'Funder')}</div>`;
+  }
   if (!identity || identity.role === 'desk') {
     return `<div class="role-strip">Viewing as ${link('desk', 'Desk')}${link('seller', 'Seller')}${link('funder', 'Funder')}</div>`;
   }
@@ -58,6 +61,9 @@ function mayPress(verb: string, identity?: { role: string } | null): boolean {
  * desk's own copy of this page needs no reminder.
  */
 function holdNote(verb: string, identity?: { role: string; name: string } | null): string {
+  if (identity?.role === 'guest') {
+    return `<p class="note" style="margin-top:18px">${esc(verb[0]!.toUpperCase() + verb.slice(1))} is pressed by ${holdersOf(verb).map((r) => `<strong>${esc(r)}</strong>`).join(' or ')}. You are reading as a guest: <a href="/login">sign in</a> to press it.</p>`;
+  }
   const holders = holdersOf(verb).filter((r) => r !== identity?.role);
   return `<p class="note" style="margin-top:18px">${esc(verb[0]!.toUpperCase() + verb.slice(1))} is pressed by ${holders.map((r) => `<strong>${esc(r)}</strong>`).join(' or ')} — not by <strong>${esc(identity?.name ?? 'desk')}</strong>. The buttons on this page follow the name you signed in with, not the lens you are reading through.</p>`;
 }

@@ -99,13 +99,14 @@ function seedBook(): { pricedId: string; fundedId: string; refusedId: string } {
 
 const book = seedBook();
 
-async function boot(opts: { offline?: boolean } = {}): Promise<() => Promise<void>> {
+async function boot(opts: { offline?: boolean; publicRead?: boolean } = {}): Promise<() => Promise<void>> {
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(ROOT, 'src', 'server.ts')], {
     cwd: ROOT,
     env: {
       ...process.env,
       DB_PATH, EVIDENCE_DIR, PORT: String(PORT),
       DEMO_PASSWORD: SHARED, DEMO_PASSWORD_DESK: DESK,
+      DEMO_PUBLIC_READ: opts.publicRead ? '1' : '',
       // The readers are optional and must not be reached from a test: no key, no network.
       EXTRACT_API_KEY: '', EXTRACT_B_API_KEY: '',
       // And the webhook id is deliberately empty, so a forged event fails its signature check
@@ -354,6 +355,36 @@ test('with no sandbox keys a fund press is answered 503 before any order exists,
     const after = JSON.parse(await (await get(`/api/invoices/${book.pricedId}`, `desk:${DESK}`)).text());
     assert.equal(after.invoice.status, before.invoice.status);
     assert.equal((after.slices ?? []).length, (before.slices ?? []).length);
+  } finally {
+    await stop();
+  }
+});
+
+
+test('DEMO_PUBLIC_READ lets a guest read the book and the deal rooms, and press nothing', async () => {
+  const stop = await boot({ offline: true, publicRead: true });
+  try {
+    const home = await get('/');
+    assert.equal(home.status, 200);
+    assert.match(await home.text(), /Read-only guest/);
+    const room = await (await get(`/invoices/${book.pricedId}?view=funder`)).text();
+    assert.match(room, /Read-only guest/);
+    assert.doesNotMatch(room, /action="\/invoices\/[A-Za-z0-9_]+\/fund"/, 'no fund form for a guest');
+    assert.match(room, /sign in<\/a> to press it/);
+    const refused = await (await get(`/invoices/${book.refusedId}`)).text();
+    assert.doesNotMatch(refused, /action="\/invoices\/[A-Za-z0-9_]+\/resubmit"/, 'no upload form for a guest');
+    assert.equal((await get('/archive')).status, 200);
+    assert.equal((await get('/ledger')).status, 200);
+    // Everything that writes, uploads or reads the machine surface stays behind the password.
+    assert.equal((await get('/submit')).status, 401);
+    assert.equal((await get('/api/invoices')).status, 401);
+    assert.equal((await get('/notices/register.csv')).status, 401);
+    assert.equal((await get('/login')).status, 401, '/login raises the password prompt');
+    assert.equal((await fetch(`${BASE}/invoices/${book.pricedId}/fund`, { method: 'POST' })).status, 401);
+    // Credentials that are offered are still checked: a wrong password is not quietly a guest.
+    assert.equal((await get('/', 'funder:wrong')).status, 401);
+    const signedIn = await get('/login', `funder:${SHARED}`);
+    assert.equal(signedIn.status, 200, 'after sign-in /login lands back on the book');
   } finally {
     await stop();
   }

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import nodePath from 'node:path';
 import crypto from 'node:crypto';
 import { config, isSandbox, assertSandbox, ROOT } from './config.ts';
-import { basicAuthIdentity, roleAllows, type Identity } from './auth.ts';
+import { basicAuthIdentity, roleAllows, isPublicReadPath, type Identity } from './auth.ts';
 import { openDb, nowIso } from './db.ts';
 import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, ledgerByKind, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim, nextResubmissionNumber, recordResubmission } from './store.ts';
 import { storedNotice, recordNoticeService, noticeServiceCsv } from './notice.ts';
@@ -270,7 +270,10 @@ const server = http.createServer(async (req, res) => {
     const favicon = req.method === 'GET' && /^\/favicon(\.ico|-32\.png|-192\.png|-512\.png)$/.test(path);
     const openPath = path === '/health' || path === '/status' || path === '/api/status' || webhookDelivery || favicon;
     const auth = basicAuthIdentity(req.headers.authorization, config.demoPassword, config.demoPasswordsByRole);
-    if (!auth.ok && !openPath) {
+    // With DEMO_PUBLIC_READ=1 a judge can open the worked examples with no password, as a guest who
+    // holds no verb. A request that carries credentials is still checked, so a wrong password is a 401.
+    const guest = !auth.ok && config.publicRead && !req.headers.authorization && isPublicReadPath(req.method, path);
+    if (!auth.ok && !openPath && !guest) {
       res.writeHead(401, {
         'WWW-Authenticate': 'Basic realm="The Discount Window (desk | seller | funder | debtor)", charset="UTF-8"',
         'Content-Type': 'text/plain'
@@ -291,7 +294,13 @@ const server = http.createServer(async (req, res) => {
       });
       return res.end(fs.readFileSync(file));
     }
-    const identity: Identity = auth.ok ? auth.identity : { role: 'desk', name: 'desk' };
+    const identity: Identity = auth.ok ? auth.identity : guest ? { role: 'guest', name: 'guest' } : { role: 'desk', name: 'desk' };
+    // /login only exists to raise the browser's password prompt from a guest page; past the wall above
+    // it has nothing to show, so it goes back to the book.
+    if (req.method === 'GET' && path === '/login') {
+      res.writeHead(303, { Location: '/' });
+      return res.end();
+    }
     // The lens opens to whoever signs in; the authority stays with the username (see `deny` below).
     // A funder who cannot put on the seller's view cannot check what the seller was told, and a
     // reviewer should not have to log out to find out what the other side of the desk looks like.

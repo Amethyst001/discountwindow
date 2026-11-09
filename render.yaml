@@ -18,6 +18,9 @@ services:
         value: /app/data/discountwindow.sqlite
       - key: PAYPAL_BASE
         value: https://api-m.sandbox.paypal.com
+      # Judges open the book and the worked examples with no password, read-only (no button offered).
+      - key: DEMO_PUBLIC_READ
+        value: "1"
       # One shared demo password; the username picks the role. Render asks for it at Blueprint
       # creation. Never commit it; hand it to judges in the Devpost testing-instructions field.
       - key: DEMO_PASSWORD
