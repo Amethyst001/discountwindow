@@ -531,7 +531,7 @@ function roleCard(invoice: any, price: any, slices: any[], view: View): string {
       : committed.length
         ? 'Committed. Approve the order in the sandbox, then the desk captures it.'
         : 'No slice committed yet.';
-    return `<div class="card" style="margin:0 0 24px;max-width:620px">
+    return `<div class="card position-card">
       <h3 style="margin-bottom:10px">Your position as funder</h3>
       <dl class="kv">
         <dt>Share of face</dt><dd>${(shareBp / 100).toFixed(0)}%</dd>
@@ -547,7 +547,7 @@ function roleCard(invoice: any, price: any, slices: any[], view: View): string {
 
   const feeShare = Math.round(Number(price.platform_fee_cents) * shareBp / 10_000);
   const sellerRemainder = face - grossSlice;
-  return `<div class="card" style="margin:0 0 24px;max-width:620px">
+  return `<div class="card position-card standalone">
     <h3 style="margin-bottom:10px">Your position as seller</h3>
     <dl class="kv">
       <dt>Face, paid by the debtor at maturity</dt><dd>${formatCents(face)}</dd>
@@ -861,6 +861,10 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
     maturityAction(invoice, price, maturity, view, identity)
   ]);
   const actionsBlock = topActions.trim() ? `<div class="verdict-actions">${topActions}</div>` : '';
+  // A funder's question is "what do I commit, what do I get" — so on the funder lens the position
+  // sits in the verdict card's right-hand column, directly above the button that commits it.
+  const role = roleCard(invoice, price, slices, view);
+  const sideBySide = view === 'funder' && role !== '';
   const checksBlock = `<section style="margin-top:30px">
       ${failing.length ? `<h3>What failed</h3><div class="card fails" style="border-left:4px solid var(--oxblood)">${failing.map((c: any) => checkRow(c, profile)).join('')}</div>` : ''}
       <details class="fold"${failing.length ? '' : ''}><summary>${esc(checksHeading)}<span class="muted">${passedCount} passed · ${failing.length} failed</span></summary>
@@ -874,15 +878,16 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
     `<div class="small muted" style="margin-top:24px"><a href="/">The book</a> / ${esc(invoice.invoice_number)}</div>`,
     `<div class="verdict ${verdictClass}">
       <div class="eyebrow"><span class="mono">${esc(invoice.invoice_number)}</span><h2>${esc(statusLabel[invoice.status] ?? invoice.status)}</h2>${statusText !== (statusLabel[invoice.status] ?? invoice.status) ? `<span class="status ${statusClass(invoice.status)}">${esc(statusText)}</span>` : ''}</div>
+      ${sideBySide ? `<div class="verdict-split"><div class="verdict-main">` : ''}
       <h1>${esc(headline)}</h1>
       <p class="verdict-line">${esc(verdictLine)}</p>
       ${reasonArea}
       ${factsBlock}
-      ${actionsBlock}
+      ${sideBySide ? `</div><aside class="verdict-side" aria-label="Your position and the action">${role}${actionsBlock}</aside></div>` : actionsBlock}
     </div>`,
     resubmissionNote,
     correctionsNote,
-    roleCard(invoice, price, slices, view),
+    sideBySide ? '' : role,
     overrideNote,
     uncorroboratedNote,
     `<div class="grid cols-detail">`,
@@ -1043,11 +1048,31 @@ export function renderSubmit(dealers: { id: string; legal_name: string; limit_ce
   return layout({ title: 'Submit', current: '/submit', sandbox, canSubmit: mayPress('submit', identity) }, body);
 }
 
-export function renderArchive(summary: any[], counts: any, recent: any[], sandbox: boolean, identity?: Identity | null, reason?: string | null): string {
+export function renderArchive(summary: any[], counts: any, recent: any[], sandbox: boolean, identity?: Identity | null, reason?: string | null, pageAsked?: number | string | null): string {
   const total = summary.reduce((a, r) => a + Number(r.n), 0);
   const known = new Set(summary.map((s) => String(s.code ?? 'REFUSED')));
   const active = reason && known.has(reason) ? reason : null;
-  const listed = active ? recent.filter((r) => String(r.reason ?? 'REFUSED') === active) : recent;
+  const matching = active ? recent.filter((r) => String(r.reason ?? 'REFUSED') === active) : recent;
+  // Same page size as the book: 25 rows a page, with the reason filter carried through the pager.
+  const PAGE_SIZE = 25;
+  const pages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Math.floor(Number(pageAsked) || 1)), pages);
+  const listed = matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const href = (pg: number) => {
+    const ps = new URLSearchParams();
+    if (active) ps.set('reason', active);
+    if (pg > 1) ps.set('page', String(pg));
+    const qs = ps.toString();
+    return `/archive${qs ? `?${qs}` : ''}`;
+  };
+  const from = matching.length ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const to = Math.min(page * PAGE_SIZE, matching.length);
+  const pager = `<div class="pager"><span class="muted">Showing ${from.toLocaleString('en-US')}–${to.toLocaleString('en-US')} of ${matching.length.toLocaleString('en-US')}</span>
+      <span style="display:flex;gap:8px;align-items:center">
+        ${page > 1 ? `<a href="${esc(href(page - 1))}" rel="prev">← Previous</a>` : '<span class="off">← Previous</span>'}
+        <span class="small muted">Page ${page} of ${pages}</span>
+        ${page < pages ? `<a href="${esc(href(page + 1))}" rel="next">Next →</a>` : '<span class="off">Next →</span>'}
+      </span></div>`;
   const reasonRow = (s: any) => {
     const code = String(s.code ?? 'REFUSED');
     const check = checkForCode(code);
@@ -1065,13 +1090,14 @@ export function renderArchive(summary: any[], counts: any, recent: any[], sandbo
         <div class="table-wrap"><table><thead><tr><th>Code</th><th>Check that raised it</th><th class="r">Invoices</th></tr></thead><tbody>${summary.map(reasonRow).join('')}</tbody></table></div>
       </div>
     </div>`,
-    `<h3>${active ? `Recent refusals for <span class="mono">${esc(active)}</span> <a class="small" href="/archive" style="font-family:var(--sans);font-weight:400;margin-left:8px">Show every reason</a>` : 'Most recent'}</h3>`,
+    `<h3>${active ? `Recent refusals for <span class="mono">${esc(active)}</span> <a class="small" href="/archive" style="font-family:var(--sans);font-weight:400;margin-left:8px">Show every reason</a>` : 'Most recent first'}</h3>`,
     listed.length === 0 ? `<p class="muted">No refusal on this desk carries this code.</p>` :
     `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Debtor</th><th class="r">Face</th><th>Reason</th><th>Date</th></tr></thead><tbody>
       ${listed.map((r) => `<tr><td><a href="/n/${encodeURIComponent(r.invoice_number)}">${esc(r.invoice_number)}</a></td><td>${esc(r.debtor_name)}</td>
         <td class="r num">${formatCents(Number(r.face_cents))}</td><td><span class="code-chip" style="font-size:0.6875rem">${esc(r.reason ?? 'REFUSED')}</span></td>
         <td class="small muted">${esc((r.created_at ?? '').slice(0, 10))}</td></tr>`).join('')}
-    </tbody></table></div>`
+    </tbody></table></div>`,
+    listed.length ? pager : ''
   ]);
   return layout({ title: 'Refusals', current: '/archive', sandbox, canSubmit: mayPress('submit', identity) }, body);
 }

@@ -427,8 +427,8 @@ const server = http.createServer(async (req, res) => {
           JOIN audit_log a ON a.subject_id = i.id AND a.kind = 'gate'
          WHERE i.status = 'REFUSED'
            AND (?1 IS NULL OR COALESCE(json_extract(a.payload_json, '$.refusals[0].code'), 'REFUSED') = ?1)
-         ORDER BY i.created_at DESC LIMIT 60`).all(reason);
-      return send(res, 200, renderArchive(summary, archiveCounts(db), recent as any[], isSandbox(), identity, reason));
+         ORDER BY i.created_at DESC, i.invoice_number DESC`).all(reason);
+      return send(res, 200, renderArchive(summary, archiveCounts(db), recent as any[], isSandbox(), identity, reason, url.searchParams.get('page')));
     }
     if (req.method === 'GET' && path === '/ledger') {
       const events = db.prepare('SELECT received_at, type, verified, outcome FROM webhook_events ORDER BY received_at DESC LIMIT 20').all();

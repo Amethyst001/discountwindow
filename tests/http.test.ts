@@ -430,6 +430,21 @@ test('the refusals page lists each reason with the check that raises it, and fil
     const unknown = await (await get('/archive?reason=NOT_A_CODE')).text();
     assert.match(unknown, /Most recent/, 'an unknown reason falls back to every reason');
     assert.doesNotMatch(unknown, /No refusal on this desk carries/);
+    // 25 rows a page, like the book; the pager keeps the reason filter and clamps a page past the end.
+    const rowsOf = (html: string) => (html.split('<h3>')[2] ?? '').match(/<tr><td><a href="\/n\//g)?.length ?? 0;
+    const first = page;
+    assert.ok(rowsOf(first) <= 25, 'no more than 25 refusals on a page');
+    const total = Number((first.match(/of ([\d,]+)<\/span>\s*<span style="display:flex/) ?? [])[1]?.replace(/,/g, '') ?? 0);
+    if (total > 25) {
+      assert.equal(rowsOf(first), 25);
+      assert.match(first, /href="\/archive\?page=2" rel="next"/);
+      const second = await (await get('/archive?page=2')).text();
+      assert.match(second, /Page 2 of/);
+      assert.notEqual(second.split('<h3>')[2], first.split('<h3>')[2], 'page 2 lists different invoices');
+      assert.match(await (await get('/archive?page=9999')).text(), new RegExp(`Page ${Math.ceil(total / 25)} of ${Math.ceil(total / 25)}`));
+    }
+    const multi = codes.find((c) => new RegExp(`reason=${c}"[^]*?<td class="r num">(\\d{2,}|2[6-9]|[3-9]\\d)`).test(first));
+    if (multi) assert.match(await (await get(`/archive?reason=${multi}`)).text(), new RegExp(`/archive\\?reason=${multi}&amp;page=2|Page 1 of 1`));
     assert.match(await (await get('/ledger')).text(), /Nothing has settled on this desk yet|Balanced/);
   } finally {
     await stop();

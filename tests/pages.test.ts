@@ -295,3 +295,15 @@ test('the status page leads with the chain\'s integrity and says when it is brok
   assert.match(bad, /✕ Broken/);
   assert.match(bad, /Broken at entry 7: hash mismatch/);
 });
+
+test('on the funder lens the position card sits beside the Fund button, inside the verdict card', () => {
+  const db = openDb(':memory:');
+  const made = intake(db, 'A-1052', doc('1Z999AA10123456789'));
+  const funder = renderDealRoom(invoiceDetail(db, made.invoiceId), true, 'funder', { role: 'funder', name: 'funder' });
+  const side = funder.split('<aside class="verdict-side"')[1]?.split('</aside>')[0] ?? '';
+  assert.match(side, /Your position as funder/, 'the position is in the right-hand column');
+  assert.match(side, /action="\/invoices\/[a-z0-9_]+\/fund"/, 'next to the button that commits it');
+  assert.equal(funder.match(/Your position as funder/g)?.length, 1, 'and is not repeated below');
+  const desk = renderDealRoom(invoiceDetail(db, made.invoiceId), true, 'desk', { role: 'desk', name: 'desk' });
+  assert.doesNotMatch(desk, /<aside class="verdict-side"/, 'the desk lens keeps the single-column verdict');
+});

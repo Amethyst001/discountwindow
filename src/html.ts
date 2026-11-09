@@ -167,6 +167,12 @@ footer { border-top: 1px solid var(--rule); margin-top: 64px; padding-top: 18px;
 .facts dd.text { font-family: var(--sans); font-weight: 500; }
 .verdict-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 18px 0 0; }
 .verdict-actions > div { margin-top: 0 !important; }
+.verdict-split { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,380px); gap: 28px; align-items: start; }
+.verdict-side { display: flex; flex-direction: column; gap: 14px; }
+.verdict-side .verdict-actions { margin: 0; }
+.position-card { margin: 0; background: #fffdf7; }
+.position-card.standalone { margin: 0 0 24px; max-width: 620px; }
+@media (max-width: 980px) { .verdict-split { grid-template-columns: minmax(0,1fr); gap: 18px; } }
 .button.primary, button.primary { font-size: 0.9375rem; padding: 14px 24px; letter-spacing: 0.03em; }
 .button.oxblood, button.oxblood { background: var(--oxblood); border-color: var(--oxblood); color: #fff; box-shadow: 3px 3px 0 rgba(120,33,31,0.22); }
 .button.oxblood:hover, button.oxblood:hover { background: #5e1817; }
