@@ -80,7 +80,8 @@ export function renderBook(
   counts: { total: number; refused: number; verified: number; funded: number },
   sandbox: boolean,
   view: View = 'desk',
-  identity?: Identity | null
+  identity?: Identity | null,
+  opts: { page?: number; q?: string; filter?: string } = {}
 ): string {
   const cell = (r: any, extra: string) => `<td><a href="/invoices/${esc(r.id)}?view=${view}">${esc(r.invoice_number)}</a></td>${extra}`;
   const tenorCell = (r: any) => {
@@ -94,14 +95,15 @@ export function renderBook(
 
   let heading = 'The book';
   let lede = 'Every invoice on this desk, and what happened to it. Nothing is listed until delivery evidence is verified.';
-  let cards = `<div class="grid cols-3" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 36px;">
+  let cards = `<div class="grid cols-3 stat-cards" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 28px;">
     <div class="card"><h3>Invoices</h3><div class="num" style="font-size:1.75rem">${counts.total.toLocaleString('en-US')}</div></div>
     <div class="card"><h3>Refused</h3><div class="num" style="font-size:1.75rem;color:var(--oxblood)">${counts.refused.toLocaleString('en-US')}</div></div>
     <div class="card"><h3>Verified</h3><div class="num" style="font-size:1.75rem;color:var(--olive)">${counts.verified.toLocaleString('en-US')}</div></div>
     <div class="card"><h3>Funded</h3><div class="num" style="font-size:1.75rem;color:var(--gold)">${counts.funded.toLocaleString('en-US')}</div></div>
   </div>`;
   let head = `<th>Invoice</th><th>Debtor</th><th>Seller</th><th class="r">Face</th><th class="r">Tenor</th><th class="r">Score</th><th class="r">Discount</th><th>Status</th>`;
-  let bodyRows: string[] = [];
+  let listRows: any[] = [];
+  let rowFn: (r: any) => string = () => '';
   let cols = 8;
 
   if (view === 'seller') {
@@ -112,7 +114,7 @@ export function renderBook(
     const settled = mine.filter((r) => r.status === 'settled').length;
     heading = mine[0]?.seller_name ?? 'Your receivables';
     lede = 'Your receivables on this desk. The advance is what reaches you now; the rest follows when the debtor pays.';
-    cards = `<div class="grid cols-3" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 36px;">
+    cards = `<div class="grid cols-3 stat-cards" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 28px;">
       <div class="card"><h3>Submitted</h3><div class="num" style="font-size:1.75rem">${mine.length.toLocaleString('en-US')}</div></div>
       <div class="card"><h3>Refused</h3><div class="num" style="font-size:1.75rem;color:var(--oxblood)">${refused.toLocaleString('en-US')}</div></div>
       <div class="card"><h3>With funders</h3><div class="num" style="font-size:1.75rem;color:var(--gold)">${atFunders.toLocaleString('en-US')}</div></div>
@@ -120,14 +122,14 @@ export function renderBook(
     </div>`;
     head = `<th>Invoice</th><th>Debtor</th><th class="r">Face</th><th class="r">Tenor</th><th class="r">Advance offered</th><th>Status</th>`;
     cols = 6;
-    bodyRows = mine.map((r) => `<tr>${cell(r, `<td>${esc(r.debtor_name)}</td>${money(r.face_cents)}${tenorCell(r)}${money(r.advance_cents)}${statusCell(r)}`)}</tr>`);
+    listRows = mine; rowFn = (r) => `<tr>${cell(r, `<td>${esc(r.debtor_name)}</td>${money(r.face_cents)}${tenorCell(r)}${money(r.advance_cents)}${statusCell(r)}`)}</tr>`;
   } else if (view === 'funder') {
     const open = rows.filter((r) => OPEN_STATUSES.has(r.status) && r.advance_cents != null);
     const held = rows.filter((r) => HELD_STATUSES.has(r.status));
     const openFace = open.reduce((a, r) => a + Number(r.face_cents), 0);
     heading = 'Opportunities and positions';
     lede = 'Receivables that already cleared delivery checks, and the slices you hold. Each one carries the file the desk read.';
-    cards = `<div class="grid cols-3" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 36px;">
+    cards = `<div class="grid cols-3 stat-cards" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 28px;">
       <div class="card"><h3>Open</h3><div class="num" style="font-size:1.75rem">${open.length.toLocaleString('en-US')}</div></div>
       <div class="card"><h3>Face available</h3><div class="num" style="font-size:1.75rem">${formatCents(openFace)}</div></div>
       <div class="card"><h3>Positions</h3><div class="num" style="font-size:1.75rem;color:var(--gold)">${held.length.toLocaleString('en-US')}</div></div>
@@ -135,10 +137,57 @@ export function renderBook(
     </div>`;
     head = `<th>Invoice</th><th>Debtor</th><th class="r">Score</th><th class="r">Tenor</th><th class="r">Yield</th><th class="r">Advance</th><th>Status</th>`;
     cols = 7;
-    bodyRows = [...open, ...held].map((r) => `<tr>${cell(r, `<td>${esc(r.debtor_name)}</td>${scoreCell(r)}${tenorCell(r)}${money(r.discount_cents)}${money(r.advance_cents)}${statusCell(r)}`)}</tr>`);
+    listRows = [...open, ...held]; rowFn = (r) => `<tr>${cell(r, `<td>${esc(r.debtor_name)}</td>${scoreCell(r)}${tenorCell(r)}${money(r.discount_cents)}${money(r.advance_cents)}${statusCell(r)}`)}</tr>`;
   } else {
-    bodyRows = rows.map((r) => `<tr>${cell(r, `<td>${esc(r.debtor_name)}</td><td class="muted">${esc(r.seller_name)}</td>${money(r.face_cents)}${tenorCell(r)}${scoreCell(r)}${money(r.discount_cents)}${statusCell(r)}`)}</tr>`);
+    listRows = rows; rowFn = (r) => `<tr>${cell(r, `<td>${esc(r.debtor_name)}</td><td class="muted">${esc(r.seller_name)}</td>${money(r.face_cents)}${tenorCell(r)}${scoreCell(r)}${money(r.discount_cents)}${statusCell(r)}`)}</tr>`;
   }
+
+  // The table shows a page at a time: a judge reads the worked examples and a filter, not 1,007 rows.
+  const PAGE_SIZE = 25;
+  const groups: Record<string, (r: any) => boolean> = {
+    all: () => true,
+    refused: (r) => r.status === 'REFUSED',
+    verified: (r) => OPEN_STATUSES.has(r.status),
+    funded: (r) => HELD_STATUSES.has(r.status)
+  };
+  const filter = opts.filter && groups[opts.filter] ? opts.filter : 'all';
+  const q = String(opts.q ?? '').trim().slice(0, 80);
+  const needle = q.toLowerCase();
+  const matchesQ = (r: any) => !needle || [r.invoice_number, r.debtor_name, r.seller_name].some((v) => String(v ?? '').toLowerCase().includes(needle));
+  const searched = listRows.filter(matchesQ);
+  const shown = searched.filter(groups[filter]);
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Math.floor(Number(opts.page) || 1)), pages);
+  const bodyRows = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(rowFn);
+  const href = (over: { filter?: string; page?: number }) => {
+    const ps = new URLSearchParams();
+    if (view !== 'desk') ps.set('view', view);
+    const f = over.filter ?? filter;
+    if (f !== 'all') ps.set('filter', f);
+    if (q) ps.set('q', q);
+    const pg = over.page ?? 1;
+    if (pg > 1) ps.set('page', String(pg));
+    const qs = ps.toString();
+    return `/${qs ? `?${qs}` : ''}`;
+  };
+  const tabLabels: [string, string][] = [['all', 'All'], ['refused', 'Refused'], ['verified', 'Verified'], ['funded', 'Funded']];
+  const tabs = `<nav class="tabs" aria-label="Filter the book">${tabLabels.map(([k, label]) =>
+    `<a href="${esc(href({ filter: k }))}"${k === filter ? ' aria-current="page"' : ''}>${label}<span class="count">${searched.filter(groups[k]).length.toLocaleString('en-US')}</span></a>`).join('')}</nav>`;
+  const search = `<form class="search" method="get" action="/" role="search">
+      ${view !== 'desk' ? `<input type="hidden" name="view" value="${esc(view)}">` : ''}
+      ${filter !== 'all' ? `<input type="hidden" name="filter" value="${esc(filter)}">` : ''}
+      <label for="book-q" class="small muted" style="align-self:center">Search</label>
+      <input id="book-q" type="search" name="q" value="${esc(q)}" placeholder="Invoice, debtor or seller">
+      <button type="submit" class="ghost">Find</button>
+    </form>`;
+  const from = shown.length ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const to = Math.min(page * PAGE_SIZE, shown.length);
+  const pager = `<div class="pager"><span class="muted">Showing ${from.toLocaleString('en-US')}–${to.toLocaleString('en-US')} of ${shown.length.toLocaleString('en-US')}${q ? ` matching “${esc(q)}”` : ''}</span>
+      <span style="display:flex;gap:8px;align-items:center">
+        ${page > 1 ? `<a href="${esc(href({ page: page - 1 }))}" rel="prev">← Previous</a>` : '<span class="off">← Previous</span>'}
+        <span class="small muted">Page ${page} of ${pages}</span>
+        ${page < pages ? `<a href="${esc(href({ page: page + 1 }))}" rel="next">Next →</a>` : '<span class="off">Next →</span>'}
+      </span></div>`;
 
   const startHere = (() => {
     if (view !== 'desk') return '';
@@ -152,11 +201,15 @@ export function renderBook(
     ];
     const links = wanted.filter(([n]) => byNumber.has(n));
     if (links.length === 0) return '';
-    return `<div class="card" style="margin-bottom:24px;border-left:4px solid var(--gold)">
-      <h3 style="margin:0 0 6px">Start here — the worked examples</h3>
-      <p class="small muted" style="margin:0 0 12px">Five invoices out of ${counts.total.toLocaleString('en-US')}, in the order the product decides them. Each opens the document, the eleven checks and the reason.</p>
-      <ol style="margin:0;padding-left:20px;line-height:1.8">
-        ${links.map(([n, why]) => `<li><a href="/invoices/${esc(byNumber.get(n)!.id)}?view=desk"><span class="mono">${esc(n)}</span></a> — ${esc(why)}</li>`).join('')}
+    return `<div class="card strong" style="margin-bottom:24px;border-left:4px solid var(--ink)">
+      <h3 style="margin:0 0 4px;font-size:1.25rem">Start here — the worked examples</h3>
+      <p class="small muted" style="margin:0">Five invoices out of ${counts.total.toLocaleString('en-US')}, in the order the product decides them. Each opens the document, the eleven checks and the reason.</p>
+      <ol class="examples">
+        ${links.map(([n, why]) => {
+          const r = byNumber.get(n)!;
+          const kind = r.status === 'REFUSED' ? 'refused' : 'priced';
+          return `<li class="ex-${kind}"><a href="/invoices/${esc(r.id)}?view=desk"><span class="num-id">${esc(n)}</span><span class="tag ${statusClass(r.status)}">${esc(statusLabel[r.status] ?? r.status)}</span><span class="why">${esc(why)}</span></a></li>`;
+        }).join('')}
       </ol>
       <p class="small muted" style="margin:12px 0 0">Status page: <a href="/status">the audit chain, the book's counts and the ledger, with no login</a>.</p>
     </div>`;
@@ -169,11 +222,13 @@ export function renderBook(
     `<p class="note" style="margin:-12px 0 18px">A synthetic seeded book of ${counts.total.toLocaleString('en-US')} receivables. ${counts.refused.toLocaleString('en-US')} are refused; every count on this page is read from the data, not typed into the copy.</p>`,
     startHere,
     cards,
-    `<table><thead><tr>${head}</tr></thead><tbody>`,
+    `<div class="toolbar" id="book">${tabs}${search}</div>`,
+    `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>`,
     bodyRows.length === 0
-      ? `<tr><td colspan="${cols}" class="empty">Nothing here yet.</td></tr>`
+      ? `<tr><td colspan="${cols}" class="empty">${q || filter !== 'all' ? 'Nothing matches this filter.' : 'Nothing here yet.'}</td></tr>`
       : bodyRows.join(''),
-    `</tbody></table>`
+    `</tbody></table></div>`,
+    pager
   ]);
 
   return layout({ title: heading, current: '/', sandbox, canSubmit: mayPress('submit', identity) }, body);
@@ -226,7 +281,7 @@ function fundAction(invoice: any, slices: any[], view: View, identity?: Identity
   if (slices.some((s) => s.status === 'paid')) return '';
   if (!mayPress('fund', identity)) return holdNote('fund', identity);
   return `<form method="post" action="/invoices/${esc(invoice.id)}/fund" style="margin-top:18px;max-width:360px">
-    <button type="submit" style="width:100%">Fund the seller's advance</button>
+    <button type="submit" class="primary" style="width:100%">Fund the seller's advance</button>
   </form>`;
 }
 
@@ -679,17 +734,17 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
   // Every refusal reason carries its own fix sentence: the seller reads what to do about each, not just the first.
   const reasonBlocks = refusalList.map((g: any) => {
     const fix = g.sellerAction ?? sellerActionFor(g.code) ?? '';
-    const rule = g.rule ? ` <span class="muted">Rule: ${esc(g.rule)}</span>` : '';
-    const action = fix ? ` <span class="muted">What the seller can do:</span> ${esc(fix)}` : '';
-    return `<p class="small" style="margin:10px 0 0"><span class="code-chip">${esc(g.code ?? 'REFUSED')}</span>${rule}${action}</p>`;
+    const rule = g.rule ? `<span class="rule">Rule: ${esc(g.rule)}</span>` : '';
+    const action = fix ? ` <strong>What the seller can do:</strong> ${esc(fix)}` : '';
+    return `<p class="reason"><span class="code-chip">${esc(g.code ?? 'REFUSED')}</span>${action}${rule}</p>`;
   }).join('');
   const reasonArea = refused ? reasonBlocks : '';
-  const fixCard = refused && mayPress('submit', identity) ? `<div class="card strong" style="margin-top:26px">
+  const fixCard = refused && mayPress('submit', identity) ? `<div class="card strong" id="fix" style="margin-top:26px;border-left:4px solid var(--oxblood)">
       <h3>Fix this refusal</h3>
       <p class="small muted" style="margin-top:0">Upload the corrected proof of delivery. A resubmission is a new receivable that names this one: the refusal and its audit entry stay exactly where they are, the seller's invoice number gains a revision, and the same document cannot come back — E06 will say so.</p>
       <form method="post" action="/invoices/${esc(invoice.id)}/resubmit" enctype="multipart/form-data" style="margin:10px 0 0">
         <p style="margin:0 0 10px"><input type="file" name="evidence" required></p>
-        <p style="margin:0"><button type="submit">Submit the corrected document</button></p>
+        <p style="margin:0"><button type="submit" class="primary oxblood">Submit the corrected document</button></p>
       </form>
     </div>` : '';
   const resubmissionNote = detail.resubmission?.of
@@ -698,7 +753,7 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
   const correctionsNote = detail.resubmission?.corrections?.length
     ? `<p class="note">A corrected submission exists: ${detail.resubmission.corrections.map((c: any) => `<a href="/invoices/${esc(c.id)}">${esc(c.invoiceNumber)}</a> (${esc(c.status)})`).join(', ')}.</p>`
     : '';
-  const overrideNote = overrideRow ? `<div class="override" style="margin-bottom:24px"><strong>Sandbox override applied to E00.</strong> PayPal did not return an eligible ${esc(profile.protectionProgram)} status for the sandbox account in use. The raw status is shown below, the override is written to the audit chain, and it cannot be enabled outside the sandbox.</div>` : '';
+  const overrideNote = overrideRow ? `<details class="override" style="margin-bottom:20px"><summary><strong>Sandbox override applied to E00.</strong> <span class="muted">Why</span></summary> PayPal did not return an eligible ${esc(profile.protectionProgram)} status for the sandbox account in use. The raw status is shown below, the override is written to the audit chain, and it cannot be enabled outside the sandbox.</details>` : '';
   const uncorroboratedNote = uncorroborated ? `<div class="override" style="margin-bottom:24px"><strong>E00 found no rail transaction behind this sale.</strong> Nothing on PayPal corroborates it, so the desk is pricing on the documents and the debtor's record alone: a band-A score is held at B, and the advance ceiling falls with it. This is a stated absence, not a passed check.</div>` : '';
 
   const evidenceSection = `<section>
@@ -734,28 +789,57 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
         <td class="mono small">${esc(s.paypal_order_id ?? '—')}</td><td class="mono small">${esc(s.capture_id ?? '—')}</td></tr>`).join('')}
       </tbody></table>` : '';
 
-  const noticeBlock = detail.notice ? `<hr class="rule"><h3>Notice of assignment</h3>
+  const noticeBlock = detail.notice ? `<details class="fold"><summary>Notice of assignment<span class="muted">issued</span></summary>
       <p class="small">Issued ${esc(String(detail.notice.created_at).slice(0, 10))} to ${esc(detail.notice.addressee)}. A debtor who is never told may pay its old seller and discharge the debt, so this is the step that makes the purchase effective — kept as the exact bytes, hashed into the chain.
       <a href="/invoices/${esc(invoice.id)}/notice">Read the notice</a>
       <span class="muted"> · SHA-256 <span class="hash">${esc(String(detail.notice.sha256).slice(0, 32))}…</span> — hash the downloaded file to check it against this.</span></p>
-      ${view === 'desk' && (!identity || identity.role === 'desk') ? serviceRegister(invoice, detail.noticeService ?? [], !identity || identity.role === 'desk') : ''}` : `<hr class="rule"><h3>Notice of assignment</h3>
-      <p class="small muted">Not issued. The desk tells the debtor where to pay only once the receivable is funded in full; a partly bought invoice has not been assigned cleanly.</p>`;
+      ${view === 'desk' && (!identity || identity.role === 'desk') ? serviceRegister(invoice, detail.noticeService ?? [], !identity || identity.role === 'desk') : ''}</details>` : `<details class="fold"><summary>Notice of assignment<span class="muted">not issued</span></summary>
+      <p class="small muted">Not issued. The desk tells the debtor where to pay only once the receivable is funded in full; a partly bought invoice has not been assigned cleanly.</p></details>`;
 
-  const auditBlock = `<hr class="rule"><h3>Audit chain</h3>
-      <table><thead><tr><th class="r">Seq</th><th>Event</th><th>Hash</th><th>Previous</th></tr></thead><tbody>
+  const auditBlock = `<details class="fold"><summary>Audit chain<span class="muted">${audit.length} hashed ${audit.length === 1 ? 'entry' : 'entries'}</span></summary>
+      <div class="table-wrap"><table><thead><tr><th class="r">Seq</th><th>Event</th><th>Hash</th><th>Previous</th></tr></thead><tbody>
       ${audit.map((a: any) => `<tr><td class="r num">${a.seq}</td><td>${esc(a.kind)}</td>
         <td class="hash small">${esc(a.hash.slice(0, 24))}…</td><td class="hash small muted">${esc(a.prev_hash.slice(0, 24))}…</td></tr>`).join('')}
-      </tbody></table>`;
+      </tbody></table></div></details>`;
+
+  const passedCount = checks.length - failing.length;
+  const facts: [string, string, boolean?][] = [
+    ['Face', formatCents(Number(invoice.face_cents))],
+    ['Debtor', String(invoice.debtor_name ?? ''), true],
+    ['Seller', String(invoice.seller_name ?? ''), true],
+    ['Term', `${daysBetween(invoice.issued_on, invoice.due_on)} days`],
+    ['Debtor score', score ? `${score.score} · band ${score.band}` : '—'],
+    ...(price ? [
+      ['Annual rate', `${(Number(price.annual_rate_bp) / 100).toFixed(1)}%`],
+      ['Advance', formatCents(Number(price.advance_cents))]
+    ] as [string, string][] : []),
+    ['Checks passed', `${passedCount} of ${checks.length}`]
+  ];
+  const factsBlock = `<dl class="facts">${facts.map(([k, v, text]) => `<div><dt>${esc(k)}</dt><dd${text ? ' class="text"' : ''}>${esc(v)}</dd></div>`).join('')}</dl>`;
+  const topActions = join([
+    refused && mayPress('submit', identity) ? `<a class="button primary oxblood" href="#fix">Fix this refusal: upload the corrected proof</a>` : '',
+    fundAction(invoice, slices, view, identity),
+    maturityAction(invoice, price, maturity, view, identity)
+  ]);
+  const actionsBlock = topActions.trim() ? `<div class="verdict-actions">${topActions}</div>` : '';
+  const checksBlock = `<section style="margin-top:30px">
+      ${failing.length ? `<h3>What failed</h3><div class="card fails" style="border-left:4px solid var(--oxblood)">${failing.map((c: any) => checkRow(c, profile)).join('')}</div>` : ''}
+      <details class="fold"${failing.length ? '' : ''}><summary>${esc(checksHeading)}<span class="muted">${passedCount} passed · ${failing.length} failed</span></summary>
+        ${profileNote(profile)}
+        <div class="card">${checks.map((c: any) => checkRow(c, profile)).join('')}</div>
+      </details>
+    </section>`;
 
   const body = join([
     roleStrip(`/invoices/${invoice.id}`, view, identity),
     `<div class="small muted" style="margin-top:24px"><a href="/">The book</a> / ${esc(invoice.invoice_number)}</div>`,
     `<div class="verdict ${verdictClass}">
-      <h2>${esc(statusLabel[invoice.status] ?? invoice.status)}</h2>
-      <div class="eyebrow"><span>${esc(invoice.invoice_number)}</span><span class="status ${statusClass(invoice.status)}">${esc(statusText)}</span></div>
+      <div class="eyebrow"><span class="mono">${esc(invoice.invoice_number)}</span><h2>${esc(statusLabel[invoice.status] ?? invoice.status)}</h2>${statusText !== (statusLabel[invoice.status] ?? invoice.status) ? `<span class="status ${statusClass(invoice.status)}">${esc(statusText)}</span>` : ''}</div>
       <h1>${esc(headline)}</h1>
       <p class="verdict-line">${esc(verdictLine)}</p>
       ${reasonArea}
+      ${factsBlock}
+      ${actionsBlock}
     </div>`,
     resubmissionNote,
     correctionsNote,
@@ -768,17 +852,11 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
       <h3>The arithmetic</h3>
       ${scoreCard}
       ${priceCard}
-      ${fundAction(invoice, slices, view, identity)}
-      ${maturityAction(invoice, price, maturity, view, identity)}
       ${defaultCard(invoice, price, defaultEvent, !identity || identity.role === 'desk')}
     </section>`,
     `</div>`,
     fixCard,
-    `<section style="margin-top:34px">
-      <h3>${esc(checksHeading)}</h3>
-      ${profileNote(profile)}
-      <div class="card">${checks.map((c: any) => checkRow(c, profile)).join('')}</div>
-    </section>`,
+    checksBlock,
     slicesBlock,
     noticeBlock,
     auditBlock

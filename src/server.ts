@@ -305,7 +305,7 @@ const server = http.createServer(async (req, res) => {
     };
     if (req.method === 'GET' && path === '/') {
       const counts = archiveCounts(db);
-      return send(res, 200, renderBook(listInvoices(db, { status: url.searchParams.get('status') ?? undefined }), counts, isSandbox(), view, identity));
+      return send(res, 200, renderBook(listInvoices(db, { status: url.searchParams.get('status') ?? undefined }), counts, isSandbox(), view, identity, { page: Number(url.searchParams.get('page') ?? 1), q: url.searchParams.get('q') ?? '', filter: url.searchParams.get('filter') ?? 'all' }));
     }
     if (req.method === 'GET' && path === '/submit') {
       // Uploading is a verb, so the form is a door and not a view: a debtor or a funder is told
