@@ -66,6 +66,13 @@ p.lede { font-size: 1.0625rem; color: var(--ink-2); max-width: 62ch; margin: 0 0
 .grid { display: grid; gap: 24px; }
 .cols-3 { grid-template-columns: minmax(0,1.15fr) minmax(0,1.1fr) minmax(0,0.9fr); }
 .cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.message-page { max-width: 680px; margin: 48px 0; padding: 28px 32px; background: var(--card, #fbf8f1); border: 1px solid rgba(25,23,18,.18); border-left: 4px solid var(--gold); }
+.message-page.refuse { border-left-color: var(--oxblood); }
+.message-page h2 { margin: 0 0 12px; }
+.message-page p { max-width: 60ch; }
+.message-page pre { white-space: pre-wrap; }
+.message-back { margin-top: 20px; }
+tr.current td { background: rgba(120,33,31,.06); }
 @media (max-width: 980px) { .cols-3, .cols-2 { grid-template-columns: minmax(0,1fr); } }
 table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 th { text-align: left; font-size: 0.75rem; letter-spacing: 0.02em; color: var(--ink-2); font-weight: 600; padding: 0 12px 8px 0; border-bottom: 1px solid var(--ink); }

@@ -1,7 +1,7 @@
 import { esc, join, layout } from './html.ts';
 import { formatCents } from './money.ts';
 import { paypalFeeOn, NON_RECOURSE_PREMIUM_BP } from './price.ts';
-import { jurisdictionFor, ruleTextFor, sellerActionFor, type Jurisdiction } from './gate.ts';
+import { jurisdictionFor, ruleTextFor, sellerActionFor, checkForCode, type Jurisdiction } from './gate.ts';
 import { roleAllows, holdersOf, type Role } from './auth.ts';
 
 const statusLabel: Record<string, string> = {
@@ -881,8 +881,9 @@ export function renderLedger(rows: any[], totals: any[], sandbox: boolean, event
   const body = join([
     `<h1>The settlement book</h1>`,
     `<p class="lede">Every posting, grouped by transaction. Each transaction must balance; the pinned row below asserts it.</p>`,
-    `<table><thead><tr><th>Txn</th><th>Account</th><th>Memo</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead><tbody>`,
-    [...byTxn.entries()].map(([txn, legs]) => {
+    rows.length === 0 ? `<div class="card" style="margin:8px 0 28px;border-left:4px solid var(--gold)"><h3 style="margin-top:0">Nothing has settled on this desk yet</h3><p class="small" style="margin:0">A posting appears here only after PayPal captures a payment. Fund <a href="/n/NW-2277?view=funder">NW-2277</a> in the sandbox to watch one land: the advance, the platform fee and, at maturity, the debtor’s payment, each as balanced legs.</p></div>` : '',
+    rows.length === 0 ? '' : `<table><thead><tr><th>Txn</th><th>Account</th><th>Memo</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead><tbody>`,
+    rows.length === 0 ? '' : [...byTxn.entries()].map(([txn, legs]) => {
       const d = legs.reduce((a, l) => a + Number(l.debits), 0);
       const c = legs.reduce((a, l) => a + Number(l.credits), 0);
       const balanced = d === c;
@@ -895,8 +896,8 @@ export function renderLedger(rows: any[], totals: any[], sandbox: boolean, event
       </tr>`).join('') + `<tr class="total"><td></td><td colspan="2" class="${balanced ? 's-verified' : 's-refused'}">${balanced ? 'Balanced' : 'UNBALANCED'}</td>
         <td class="r num">${formatCents(d)}</td><td class="r num">${formatCents(c)}</td></tr>`;
     }).join(''),
-    `</tbody></table>`,
-    `<hr class="rule"><h3>Account totals</h3>
+    rows.length === 0 ? '' : `</tbody></table>`,
+    totals.length === 0 ? '' : `<hr class="rule"><h3>Account totals</h3>
      <table><thead><tr><th>Account</th><th>Kind</th><th class="r">Debits</th><th class="r">Credits</th><th class="r">Balance</th></tr></thead><tbody>
      ${totals.map((t) => `<tr><td class="mono">${esc(t.account)}</td><td class="muted">${esc(t.kind)}</td>
        <td class="r num">${formatCents(Number(t.debits))}</td><td class="r num">${formatCents(Number(t.credits))}</td>
@@ -1013,24 +1014,35 @@ export function renderSubmit(dealers: { id: string; legal_name: string; limit_ce
   return layout({ title: 'Submit', current: '/submit', sandbox, canSubmit: mayPress('submit', identity) }, body);
 }
 
-export function renderArchive(summary: any[], counts: any, recent: any[], sandbox: boolean, identity?: Identity | null): string {
+export function renderArchive(summary: any[], counts: any, recent: any[], sandbox: boolean, identity?: Identity | null, reason?: string | null): string {
   const total = summary.reduce((a, r) => a + Number(r.n), 0);
+  const known = new Set(summary.map((s) => String(s.code ?? 'REFUSED')));
+  const active = reason && known.has(reason) ? reason : null;
+  const listed = active ? recent.filter((r) => String(r.reason ?? 'REFUSED') === active) : recent;
+  const reasonRow = (s: any) => {
+    const code = String(s.code ?? 'REFUSED');
+    const check = checkForCode(code);
+    return `<tr${code === active ? ' class="current"' : ''}><td><a class="code-chip" style="font-size:0.6875rem" href="/archive?reason=${encodeURIComponent(code)}">${esc(code)}</a></td>
+      <td class="small">${check ? `<span class="mono muted">${esc(check.id)}</span> ${esc(check.title)}` : '<span class="muted">—</span>'}</td>
+      <td class="r num">${Number(s.n).toLocaleString('en-US')}</td></tr>`;
+  };
   const body = join([
     `<h1>What this desk refused</h1>`,
-    `<p class="lede">A refusal is the product. Each row below is an invoice that could not be financed, and the check that stopped it.</p>`,
-    `<div class="grid cols-2" style="margin-bottom:36px">
+    `<p class="lede">A refusal is the product. Each row below is an invoice that could not be financed, the check that stopped it, and — on the invoice page — what the seller can do about it.</p>`,
+    `<div class="grid cols-2" style="margin-bottom:36px;grid-template-columns:minmax(0,1fr) minmax(0,2fr)">
       <div class="card"><h3>Refusals on record</h3><div class="num" style="font-size:2.25rem;color:var(--oxblood)">${total.toLocaleString('en-US')}</div>
-        <p class="small muted" style="margin:6px 0 0">of ${Number(counts.total).toLocaleString('en-US')} invoices received</p></div>
+        <p class="small muted" style="margin:6px 0 0">of ${Number(counts.total).toLocaleString('en-US')} invoices received, in a synthetic seeded book</p></div>
       <div class="card"><h3>By reason</h3>
-        <table>${summary.map((s) => `<tr><td class="mono small">${esc(s.code ?? 'REFUSED')}</td><td class="r num">${Number(s.n).toLocaleString('en-US')}</td></tr>`).join('')}</table>
+        <div class="table-wrap"><table><thead><tr><th>Code</th><th>Check that raised it</th><th class="r">Invoices</th></tr></thead><tbody>${summary.map(reasonRow).join('')}</tbody></table></div>
       </div>
     </div>`,
-    `<h3>Most recent</h3>`,
-    `<table><thead><tr><th>Invoice</th><th>Debtor</th><th class="r">Face</th><th>Reason</th><th>Date</th></tr></thead><tbody>
-      ${recent.map((r) => `<tr><td><a href="/invoices/${esc(r.id)}">${esc(r.invoice_number)}</a></td><td>${esc(r.debtor_name)}</td>
+    `<h3>${active ? `Recent refusals for <span class="mono">${esc(active)}</span> <a class="small" href="/archive" style="font-family:var(--sans);font-weight:400;margin-left:8px">Show every reason</a>` : 'Most recent'}</h3>`,
+    listed.length === 0 ? `<p class="muted">No refusal on this desk carries this code.</p>` :
+    `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Debtor</th><th class="r">Face</th><th>Reason</th><th>Date</th></tr></thead><tbody>
+      ${listed.map((r) => `<tr><td><a href="/n/${encodeURIComponent(r.invoice_number)}">${esc(r.invoice_number)}</a></td><td>${esc(r.debtor_name)}</td>
         <td class="r num">${formatCents(Number(r.face_cents))}</td><td><span class="code-chip" style="font-size:0.6875rem">${esc(r.reason ?? 'REFUSED')}</span></td>
         <td class="small muted">${esc((r.created_at ?? '').slice(0, 10))}</td></tr>`).join('')}
-    </tbody></table>`
+    </tbody></table></div>`
   ]);
   return layout({ title: 'Refusals', current: '/archive', sandbox, canSubmit: mayPress('submit', identity) }, body);
 }

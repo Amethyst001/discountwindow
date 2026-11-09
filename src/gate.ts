@@ -97,6 +97,18 @@ for (const c of RULES.checks as any[]) {
   }
 }
 
+/** The check that raises a refusal code, as id and title, for pages that list refusals by reason. */
+const CHECK_BY_CODE = new Map<string, { id: string; title: string }>();
+for (const c of RULES.checks as any[]) {
+  for (const key of ['refusal', 'refusalWhenUnreadable', 'refusalWhenLate']) {
+    if (c[key] && !CHECK_BY_CODE.has(c[key])) CHECK_BY_CODE.set(c[key], { id: String(c.id), title: String(c.title).trim() });
+  }
+}
+
+export function checkForCode(code: string | null | undefined): { id: string; title: string } | null {
+  return code ? CHECK_BY_CODE.get(code) ?? null : null;
+}
+
 export function sellerActionFor(code: string | null | undefined): string | null {
   return SELLER_ACTION_BY_CODE.get(String(code ?? '')) ?? null;
 }

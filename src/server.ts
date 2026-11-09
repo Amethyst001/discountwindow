@@ -17,7 +17,7 @@ import type { Cents } from './money.ts';
 import type { DebtorHistory } from './score.ts';
 import { extractEvidence } from './extract.ts';
 import { parseMoneyToCents } from './money.ts';
-import { esc } from './html.ts';
+import { esc, layout } from './html.ts';
 
 assertSandbox();
 const db = openDb();
@@ -97,9 +97,18 @@ function sniffMime(bytes: Buffer, declared: string): string | null {
   return printable ? 'text/plain' : null;
 }
 
+/** A short message page in the app's own shell, so a stop on the money path reads like the rest of the desk. */
+function messagePage(title: string, bodyHtml: string, back: { href: string; label: string }, tone: 'plain' | 'refuse' = 'plain'): string {
+  return layout({ title, current: '', sandbox: isSandbox() }, `
+  <section class="message-page${tone === 'refuse' ? ' refuse' : ''}">
+    <h2>${esc(title)}</h2>
+    ${bodyHtml}
+    <p class="message-back"><a class="button" href="${esc(back.href)}">${esc(back.label)}</a></p>
+  </section>`);
+}
+
 function noticePage(title: string, message: string, back: string): string {
-  return `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><body style="font-family:system-ui;padding:40px;background:#f4efe4;color:#191712;max-width:640px">
-    <h1 style="font-family:Georgia,serif;font-weight:500">${esc(title)}</h1><p>${esc(message)}</p><p><a href="${esc(back)}">Back to the invoice</a></p>`;
+  return messagePage(title, `<p>${esc(message)}</p>`, { href: back, label: 'Back to the invoice' });
 }
 
 /** The five settings a money movement needs. Reading the book, the gate and a refusal never need them. */
@@ -248,10 +257,9 @@ const DEMO_IDENTITIES: Identity[] = [
 ];
 
 function forbidden(identity: Identity, verb: string): string {
-  return `<!doctype html><meta charset="utf-8"><title>Not this account</title><body style="font-family:system-ui;padding:40px;background:#f4efe4;color:#191712;max-width:640px">
-    <h1 style="font-family:Georgia,serif;font-weight:500">Not this account</h1>
-    <p><strong>${esc(identity.name)}</strong> is signed in as ${esc(identity.role)}, which may not ${esc(verb)} an invoice. The four demo identities and what each may do are listed in the README.</p>
-    <p><a href="/">Back to the book</a></p>`;
+  return messagePage('Not this account',
+    `<p><strong>${esc(identity.name)}</strong> is signed in as ${esc(identity.role)}, which may not ${esc(verb)} an invoice. The four demo identities and what each may do are listed in the README.</p>`,
+    { href: '/', label: 'Back to the book' }, 'refuse');
 }
 
 /**
@@ -291,9 +299,11 @@ const server = http.createServer(async (req, res) => {
     if (!auth.ok && !openPath && !guest) {
       res.writeHead(401, {
         'WWW-Authenticate': 'Basic realm="The Discount Window (desk | seller | funder | debtor)", charset="UTF-8"',
-        'Content-Type': 'text/plain'
+        'Content-Type': 'text/html; charset=utf-8'
       });
-      return res.end('Authentication required. Use one of the demo usernames: desk, seller, funder, debtor.');
+      return res.end(messagePage('Sign in to do this',
+        `<p>Authentication required. Use one of the demo usernames: <span class="mono">desk</span>, <span class="mono">seller</span>, <span class="mono">funder</span>, <span class="mono">debtor</span>, with the demo password.</p>${config.publicRead ? '<p class="small muted">The book, the refusals, the settlement book and every invoice page open without a password, read-only.</p>' : ''}`,
+        { href: config.publicRead ? '/' : '/status', label: config.publicRead ? 'Read the book as a guest' : 'See the public status page' }));
     }
     if (favicon) {
       // Served from brand/ with a fixed allow-list of names; the regex above decides what reaches here.
@@ -406,6 +416,9 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
     if (req.method === 'GET' && path === '/archive') {
+      const summary = archiveSummary(db);
+      const asked = url.searchParams.get('reason');
+      const reason = asked && summary.some((r: any) => String(r.code ?? 'REFUSED') === asked) ? asked : null;
       const recent = db.prepare(`
         SELECT i.id, i.invoice_number, i.face_cents, i.created_at, d.legal_name AS debtor_name,
                json_extract(a.payload_json, '$.refusals[0].code') AS reason
@@ -413,8 +426,9 @@ const server = http.createServer(async (req, res) => {
           JOIN debtors d ON d.id = i.debtor_id
           JOIN audit_log a ON a.subject_id = i.id AND a.kind = 'gate'
          WHERE i.status = 'REFUSED'
-         ORDER BY i.created_at DESC LIMIT 60`).all();
-      return send(res, 200, renderArchive(archiveSummary(db), archiveCounts(db), recent as any[], isSandbox(), identity));
+           AND (?1 IS NULL OR COALESCE(json_extract(a.payload_json, '$.refusals[0].code'), 'REFUSED') = ?1)
+         ORDER BY i.created_at DESC LIMIT 60`).all(reason);
+      return send(res, 200, renderArchive(summary, archiveCounts(db), recent as any[], isSandbox(), identity, reason));
     }
     if (req.method === 'GET' && path === '/ledger') {
       const events = db.prepare('SELECT received_at, type, verified, outcome FROM webhook_events ORDER BY received_at DESC LIMIT 20').all();
@@ -479,7 +493,7 @@ const server = http.createServer(async (req, res) => {
     const numberMatch = /^\/n\/([A-Za-z0-9-]{1,40})$/.exec(path);
     if (req.method === 'GET' && numberMatch) {
       const row = db.prepare('SELECT id FROM invoices WHERE invoice_number = ? ORDER BY created_at LIMIT 1').get(numberMatch[1]) as any;
-      if (!row) return send(res, 404, 'No invoice with that number is on this desk.', 'text/plain');
+      if (!row) return send(res, 404, messagePage('Not found', '<p>No invoice with that number is on this desk.</p>', { href: '/', label: 'Back to the book' }));
       const lens = url.searchParams.get('view');
       res.writeHead(303, { Location: `/invoices/${row.id}${lens === 'seller' || lens === 'funder' || lens === 'desk' ? `?view=${lens}` : ''}` });
       return res.end();
@@ -756,12 +770,12 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, layout404(), 'text/html; charset=utf-8');
   } catch (err: any) {
     console.error(err);
-    return send(res, 500, `<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:40px;background:#f4efe4;color:#191712"><h1>Something failed</h1><pre>${esc(err?.message ?? err)}</pre></body>`);
+    return send(res, 500, messagePage('Something failed', `<pre class="mono small">${esc(err?.message ?? err)}</pre>`, { href: '/', label: 'Back to the book' }, 'refuse'), 'text/html; charset=utf-8');
   }
 });
 
 function layout404(): string {
-  return `<!doctype html><meta charset="utf-8"><title>Not found</title><body style="font-family:system-ui;padding:40px;background:#f4efe4;color:#191712"><h1>Not found</h1><p><a href="/">The book</a></p></body>`;
+  return messagePage('Not found', '<p>Nothing lives at this address. Invoice links take the form <span class="mono">/n/A-1043</span>.</p>', { href: '/', label: 'Back to the book' });
 }
 
 server.listen(config.port, () => {

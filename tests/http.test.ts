@@ -186,6 +186,8 @@ test('the routes enforce the login, the name and the verb — over HTTP, not in 
     assert.equal((await post(`/invoices/${book.pricedId}/fund`, `seller:${SHARED}`)).status, 403);
     const forbidden = await (await post(`/invoices/${book.pricedId}/fund`, `seller:${SHARED}`)).text();
     assert.match(forbidden, /seller<\/strong> is signed in as seller, which may not fund an invoice/);
+    assert.match(forbidden, /class="wordmark"/, 'a refusal of the action is shown inside the app shell');
+    assert.match(forbidden, /class="message-page refuse"/);
 
     // The register: one file, whole book, desk name only.
     const refused = await get('/notices/register.csv', `seller:${SHARED}`);
@@ -379,9 +381,13 @@ test('DEMO_PUBLIC_READ lets a guest read the book and the deal rooms, and press 
     assert.equal(byNumber.status, 303);
     assert.match(byNumber.headers.get('location') ?? '', /^\/invoices\/[A-Za-z0-9_]+$/);
     assert.equal((await fetch(`${BASE}/n/NOPE-404`, { redirect: 'manual' })).status, 404);
+    assert.match(await (await fetch(`${BASE}/n/NOPE-404`, { redirect: 'manual' })).text(), /class="wordmark"[\s\S]*Not found/, 'the 404 keeps the masthead');
     assert.equal((await get('/ledger')).status, 200);
     // Everything that writes, uploads or reads the machine surface stays behind the password.
     assert.equal((await get('/submit')).status, 401);
+    const wall = await get('/submit');
+    assert.match(wall.headers.get('content-type') ?? '', /text\/html/);
+    assert.match(await wall.text(), /class="wordmark"[\s\S]*demo usernames[\s\S]*open without a password/, 'the password wall explains itself in the app shell');
     assert.equal((await get('/api/invoices')).status, 401);
     assert.equal((await get('/notices/register.csv')).status, 401);
     assert.equal((await get('/login')).status, 401, '/login raises the password prompt');
@@ -403,6 +409,28 @@ test('DEMO_PUBLIC_READ lets a guest read the book and the deal rooms, and press 
     assert.equal(photo.headers.get('content-type'), 'image/jpeg');
     assert.match(await (await get(`/invoices/${book.fundedId}`)).text(), /<img src="\/invoices\/[A-Za-z0-9_]+\/evidence"/);
     assert.equal((await get(`/invoices/${book.refusedId}/evidence`)).status, 404, 'no path outside the evidence roots');
+  } finally {
+    await stop();
+  }
+});
+
+test('the refusals page lists each reason with the check that raises it, and filters by reason', async () => {
+  const stop = await boot({ offline: true, publicRead: true });
+  try {
+    const page = await (await get('/archive')).text();
+    const codes = [...page.matchAll(/href="\/archive\?reason=([A-Z_]+)"/g)].map((m) => m[1]);
+    assert.ok(codes.length > 0, 'at least one reason is listed');
+    assert.match(page, /E\d\d<\/span> [A-Z]/, 'a reason names its check');
+    const code = codes[0];
+    const filtered = await (await get(`/archive?reason=${code}`)).text();
+    assert.match(filtered, new RegExp(`Recent refusals for <span class="mono">${code}`));
+    const chips = [...filtered.split('<h3>Recent refusals')[1].matchAll(/<span class="code-chip"[^>]*>([A-Z_]+)<\/span>/g)].map((m) => m[1]);
+    assert.ok(chips.length > 0);
+    assert.ok(chips.every((c) => c === code), 'only that reason is listed');
+    const unknown = await (await get('/archive?reason=NOT_A_CODE')).text();
+    assert.match(unknown, /Most recent/, 'an unknown reason falls back to every reason');
+    assert.doesNotMatch(unknown, /No refusal on this desk carries/);
+    assert.match(await (await get('/ledger')).text(), /Nothing has settled on this desk yet|Balanced/);
   } finally {
     await stop();
   }
