@@ -34,7 +34,7 @@ function capUnverified(db: DatabaseSync): void {
   db.prepare(`
     DELETE FROM webhook_events
      WHERE verified = 0
-       AND id IN (SELECT id FROM webhook_events WHERE verified = 0 ORDER BY received_at DESC LIMIT -1 OFFSET ?)
+       AND id IN (SELECT id FROM webhook_events WHERE verified = 0 ORDER BY received_at DESC, rowid DESC LIMIT -1 OFFSET ?)
   `).run(UNVERIFIED_CAP);
 }
 
