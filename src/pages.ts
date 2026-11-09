@@ -1077,7 +1077,7 @@ export function renderArchive(summary: any[], counts: any, recent: any[], sandbo
     const code = String(s.code ?? 'REFUSED');
     const check = checkForCode(code);
     return `<tr${code === active ? ' class="current"' : ''}><td><a class="code-chip" style="font-size:0.6875rem" href="/archive?reason=${encodeURIComponent(code)}">${esc(code)}</a></td>
-      <td class="small">${check ? `<span class="mono muted">${esc(check.id)}</span> ${esc(check.title)}` : '<span class="muted">—</span>'}</td>
+      <td class="small">${check ? `<span class="mono muted">${esc(check.id)}</span> ${esc(check.title)}` : code === 'BAND_LIMIT' ? '<span class="muted">Pricing:</span> the band\'s tenor or size limit' : '<span class="muted">—</span>'}</td>
       <td class="r num">${Number(s.n).toLocaleString('en-US')}</td></tr>`;
   };
   const body = join([

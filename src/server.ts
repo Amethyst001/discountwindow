@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { config, isSandbox, assertSandbox, ROOT } from './config.ts';
 import { basicAuthIdentity, roleAllows, isPublicReadPath, type Identity } from './auth.ts';
 import { openDb, nowIso } from './db.ts';
-import { listInvoices, invoiceDetail, archiveSummary, archiveCounts, ledgerRows, ledgerTotals, ledgerByKind, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim, nextResubmissionNumber, recordResubmission } from './store.ts';
+import { listInvoices, invoiceDetail, archiveSummary, REFUSAL_REASON_SQL, archiveCounts, ledgerRows, ledgerTotals, ledgerByKind, createFundingOrder, captureFunding, createMaturityOrder, captureMaturity, addSlice, ensureParty, intakeInvoice, debtorHistory, sweepOverdue, declareDefault, collectRepurchase, writeOffClaim, nextResubmissionNumber, recordResubmission } from './store.ts';
 import { storedNotice, recordNoticeService, noticeServiceCsv } from './notice.ts';
 import { renderBook, renderDealRoom, renderLedger, renderArchive, renderSubmit, renderStatus, viewOf } from './pages.ts';
 import { verifyChain, appendAudit } from './audit.ts';
@@ -420,14 +420,13 @@ const server = http.createServer(async (req, res) => {
       const asked = url.searchParams.get('reason');
       const reason = asked && summary.some((r: any) => String(r.code ?? 'REFUSED') === asked) ? asked : null;
       const recent = db.prepare(`
-        SELECT i.id, i.invoice_number, i.face_cents, i.created_at, d.legal_name AS debtor_name,
-               json_extract(a.payload_json, '$.refusals[0].code') AS reason
-          FROM invoices i
-          JOIN debtors d ON d.id = i.debtor_id
-          JOIN audit_log a ON a.subject_id = i.id AND a.kind = 'gate'
-         WHERE i.status = 'REFUSED'
-           AND (?1 IS NULL OR COALESCE(json_extract(a.payload_json, '$.refusals[0].code'), 'REFUSED') = ?1)
-         ORDER BY i.created_at DESC, i.invoice_number DESC`).all(reason);
+        SELECT * FROM (
+          SELECT i.id, i.invoice_number, i.face_cents, i.created_at, d.legal_name AS debtor_name, ${REFUSAL_REASON_SQL} AS reason
+            FROM invoices i
+            JOIN debtors d ON d.id = i.debtor_id
+           WHERE i.status = 'REFUSED')
+         WHERE (?1 IS NULL OR COALESCE(reason, 'REFUSED') = ?1)
+         ORDER BY created_at DESC, invoice_number DESC`).all(reason);
       return send(res, 200, renderArchive(summary, archiveCounts(db), recent as any[], isSandbox(), identity, reason, url.searchParams.get('page')));
     }
     if (req.method === 'GET' && path === '/ledger') {

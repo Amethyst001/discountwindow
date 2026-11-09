@@ -324,11 +324,17 @@ export function recordResubmission(db: DatabaseSync, refusedInvoiceId: string, i
     .run(newId('rs'), refusedInvoiceId, invoiceId, nowIso());
 }
 
+// The reason an invoice is refused: the gate's first refusal if the documents failed, otherwise the
+// pricing rule that declined paper the gate had passed (a band C tenor cap, say). Counting gate rows
+// alone left pricing refusals out of the total and listed them with no reason.
+export const REFUSAL_REASON_SQL = `(SELECT json_extract(d.reasons_json, '$[0].code') FROM decisions d
+   WHERE d.invoice_id = i.id AND d.verdict = 'REFUSED' ORDER BY (d.kind = 'gate') DESC, d.created_at DESC LIMIT 1)`;
+
 export function archiveSummary(db: DatabaseSync): any[] {
   return db.prepare(`
-    SELECT json_extract(payload_json, '$.refusals[0].code') AS code, COUNT(*) AS n
-      FROM audit_log WHERE kind = 'gate' AND json_extract(payload_json, '$.verdict') = 'REFUSED'
-     GROUP BY code ORDER BY n DESC
+    SELECT ${REFUSAL_REASON_SQL} AS code, COUNT(*) AS n
+      FROM invoices i WHERE i.status = 'REFUSED'
+     GROUP BY code ORDER BY n DESC, code
   `).all() as any[];
 }
 

@@ -450,3 +450,18 @@ test('the refusals page lists each reason with the check that raises it, and fil
     await stop();
   }
 });
+
+test('the refusals total matches the book, and a pricing refusal is listed with its own reason', async () => {
+  const stop = await boot({ offline: true, publicRead: true });
+  try {
+    const page = await (await get('/archive')).text();
+    const total = Number((page.match(/Refusals on record<\/h3><div class="num"[^>]*>([\d,]+)/) ?? [])[1]?.replace(/,/g, ''));
+    const listed = Number((page.match(/Showing [\d,]+–[\d,]+ of ([\d,]+)/) ?? [])[1]?.replace(/,/g, ''));
+    assert.ok(total > 0);
+    assert.equal(total, listed, 'the headline count and the list agree');
+    const rows = page.split('Most recent first')[1] ?? '';
+    assert.doesNotMatch(rows, /<span class="code-chip"[^>]*>REFUSED<\/span>/, 'every listed refusal names its reason');
+  } finally {
+    await stop();
+  }
+});
