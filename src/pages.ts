@@ -38,7 +38,7 @@ function roleStrip(basePath: string, view: View, identity?: { role: string; name
     return `<a href="${href}"${view === id ? ' class="on"' : ''}>${label}</a>`;
   };
   if (identity?.role === 'guest') {
-    return `<div class="role-strip"><span><strong>Read-only guest.</strong> Every page is readable; no button is offered. <a href="/login">Sign in</a> as desk, seller, funder or debtor to act.</span> Viewing as ${link('desk', 'Desk')}${link('seller', 'Seller')}${link('funder', 'Funder')}</div>`;
+    return `<div class="role-strip"><span><strong>Read-only guest.</strong> Every page is readable; the buttons are shown switched off. <a href="/login">Sign in</a> as desk, seller, funder or debtor to act.</span> Viewing as ${link('desk', 'Desk')}${link('seller', 'Seller')}${link('funder', 'Funder')}</div>`;
   }
   if (!identity || identity.role === 'desk') {
     return `<div class="role-strip">Viewing as ${link('desk', 'Desk')}${link('seller', 'Seller')}${link('funder', 'Funder')}</div>`;
@@ -60,12 +60,20 @@ function mayPress(verb: string, identity?: { role: string } | null): boolean {
  * naming who holds the verb. A dead button that answers 403 teaches the reader nothing, and the
  * desk's own copy of this page needs no reminder.
  */
+const VERB_BUTTON: Record<string, string> = {
+  fund: "Fund the seller's advance", capture: 'Capture the approved payment', settle: 'Settle at maturity', submit: 'Submit the corrected document'
+};
 function holdNote(verb: string, identity?: { role: string; name: string } | null): string {
+  // The step is still shown as the page's main action, switched off, with who can press it beside it:
+  // a reader sees what this page is for without being handed a button that answers 403.
+  const label = VERB_BUTTON[verb];
+  const ghost = label ? `<button type="button" class="primary" disabled aria-disabled="true">${esc(label)}</button>` : '';
+  const Verb = esc(verb[0]!.toUpperCase() + verb.slice(1));
   if (identity?.role === 'guest') {
-    return `<p class="note" style="margin-top:18px">${esc(verb[0]!.toUpperCase() + verb.slice(1))} is pressed by ${holdersOf(verb).map((r) => `<strong>${esc(r)}</strong>`).join(' or ')}. You are reading as a guest: <a href="/login">sign in</a> to press it.</p>`;
+    return `<div class="held">${ghost}<p class="note">${Verb} is pressed by ${holdersOf(verb).map((r) => `<strong>${esc(r)}</strong>`).join(' or ')}. You are reading as a guest: <a href="/login">sign in</a> to press it.</p></div>`;
   }
   const holders = holdersOf(verb).filter((r) => r !== identity?.role);
-  return `<p class="note" style="margin-top:18px">${esc(verb[0]!.toUpperCase() + verb.slice(1))} is pressed by ${holders.map((r) => `<strong>${esc(r)}</strong>`).join(' or ')} — not by <strong>${esc(identity?.name ?? 'desk')}</strong>. The buttons on this page follow the name you signed in with, not the lens you are reading through.</p>`;
+  return `<div class="held">${ghost}<p class="note">${Verb} is pressed by ${holders.map((r) => `<strong>${esc(r)}</strong>`).join(' or ')} — not by <strong>${esc(identity?.name ?? 'desk')}</strong>. The buttons on this page follow the name you signed in with, not the lens you are reading through.</p></div>`;
 }
 
 function daysBetween(a: string, b: string): number {
@@ -101,11 +109,13 @@ export function renderBook(
 
   let heading = 'The book';
   let lede = 'For funders who pay exporters early against their invoices: every invoice here was checked against its proof of delivery before anyone could fund it. Refused paper says why and what the seller can fix; verified paper is priced. Nothing is listed until delivery evidence is verified.';
+  const statCard = (filterKey: string, label: string, n: number, color: string) =>
+    `<a class="card stat" href="/?filter=${filterKey}#book"><h3>${label}</h3><div class="num" style="font-size:1.75rem${color ? `;color:${color}` : ''}">${n.toLocaleString('en-US')}</div></a>`;
   let cards = `<div class="grid cols-3 stat-cards" style="grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom: 28px;">
-    <div class="card"><h3>Invoices</h3><div class="num" style="font-size:1.75rem">${counts.total.toLocaleString('en-US')}</div></div>
-    <div class="card"><h3>Refused</h3><div class="num" style="font-size:1.75rem;color:var(--oxblood)">${counts.refused.toLocaleString('en-US')}</div></div>
-    <div class="card"><h3>Verified</h3><div class="num" style="font-size:1.75rem;color:var(--olive)">${counts.verified.toLocaleString('en-US')}</div></div>
-    <div class="card"><h3>Funded</h3><div class="num" style="font-size:1.75rem;color:var(--gold)">${counts.funded.toLocaleString('en-US')}</div></div>
+    ${statCard('all', 'Invoices', counts.total, '')}
+    ${statCard('refused', 'Refused', counts.refused, 'var(--oxblood)')}
+    ${statCard('verified', 'Verified', counts.verified, 'var(--olive)')}
+    ${statCard('funded', 'Funded', counts.funded, 'var(--gold)')}
   </div>`;
   let head = `<th>Invoice</th><th>Debtor</th><th>Seller</th><th class="r">Face</th><th class="r">Tenor</th><th class="r">Score</th><th class="r">Discount</th><th>Status</th>`;
   let listRows: any[] = [];
@@ -591,7 +601,7 @@ function extractionReadBy(extraction: any): string {
     <p class="small" style="margin:0 0 10px">
       ${readSentence()}
     </p>
-    ${fields.length ? `<dl class="kv">${fields.map(([k, v]) => `<dt class="muted">${esc(k)}</dt><dd>${(Number(v) * 100).toFixed(0)}%</dd>`).join('')}</dl>` : ''}
+    ${fields.length ? `<dl class="kv">${fields.map(([k, v]) => `<dt class="muted">${esc(fieldLabel(k))}</dt><dd>${(Number(v) * 100).toFixed(0)}%</dd>`).join('')}</dl>` : ''}
     ${readerDiffTable(extraction)}
     ${notes.length ? `<p class="small muted" style="margin:10px 0 0">${notes.map((n) => esc(n)).join('<br>')}</p>` : ''}
     <p class="small muted" style="margin:10px 0 0">A field under 70% is treated as unreadable. The gate reads these numbers; the model never sees the verdict.</p>
@@ -641,7 +651,7 @@ function readerDiffTable(extraction: any): string {
       const differs = new Set(values.map(key)).size > 1;
       const conf = confidences[field];
       return `<tr${differs ? ' class="diff"' : ''}>
-        <td class="small mono">${esc(field)}</td>
+        <td class="small">${esc(fieldLabel(field))}</td>
         ${readers.map((r) => `<td class="small">${show(r.pod[field])}</td>`).join('')}
         <td class="small">${show(parserPod[field])}</td>
         <td class="small">${show(reconciled[field])}</td>
@@ -682,6 +692,17 @@ function profileNote(j: Jurisdiction): string {
   </div>`;
 }
 
+const FIELD_LABEL: Record<string, string> = {
+  trackingNumber: 'Tracking number', consigneeName: 'Consignee', deliveredOn: 'Delivered on',
+  deliveryAddress: 'Delivery address', hasSignature: 'Signature', delivered: 'Delivered status', hasPhoto: 'Photo', status: 'Status'
+};
+const SCORE_LABEL: Record<string, string> = {
+  onTime: 'Paid on time', daysLate: 'Days late, on average', exposure: 'Exposure to this debtor',
+  relationship: 'Length of relationship', disputes: 'Dispute history', size: 'Invoice size'
+};
+export function fieldLabel(k: string): string { return FIELD_LABEL[k] ?? k; }
+export function scoreLabel(k: string): string { return SCORE_LABEL[k] ?? k; }
+
 function readableCode(code: string): string {
   return String(code ?? 'refused').toLowerCase().replace(/_/g, ' ');
 }
@@ -702,11 +723,18 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
   const disagreementMarks = readerDisagreementMarks((() => {
     try { return JSON.parse(extraction?.fields_json ?? '{}').notes; } catch { return []; }
   })());
-  const highlightWords = [...(failing.length
-    ? [/(?:consignee|ship to)[:\s]+([^\n]+)/i, /(?:address)[:\s]+([^\n]+)/i, /(?:tracking)[:\s]+([^\n]+)/i]
-        .map((re) => { const m = re.exec(rawText); return m ? m[1].trim() : ''; })
-        .filter(Boolean)
-    : []), ...disagreementMarks];
+  // Mark only the line a failing check actually read, found through the region the gate recorded.
+  const REGION_LINE: Record<string, RegExp> = {
+    'pod.consigneeName': /^\s*consignee\s*:\s*(.+)$/im,
+    'pod.deliveryAddress': /^\s*(?:ship to|delivery address|address)\s*:\s*(.+)$/im,
+    'pod.trackingNumber': /^\s*tracking(?:\s*(?:number|no\.?|#))?\s*:\s*(.+)$/im,
+    'pod.deliveredOn': /^\s*delivered(?:\s*on)?\s*:\s*(.+)$/im,
+    'pod.status': /^\s*status\s*:\s*(.+)$/im
+  };
+  const failedLines = [...new Set(failing.map((c: any) => String(c.evidence_region ?? '')))]
+    .map((region) => { const re = REGION_LINE[region]; const m = re ? re.exec(rawText) : null; return m ? m[1].trim() : ''; })
+    .filter(Boolean);
+  const highlightWords = [...failedLines, ...disagreementMarks];
   const components = score ? JSON.parse(score.components_json) : null;
   const gateReasons: any[] = (() => {
     const gate = decisions.find((d: any) => d.kind === 'gate');
@@ -766,29 +794,33 @@ export function renderDealRoom(detail: any, sandbox: boolean, view: View = 'desk
       <h3>The evidence</h3>
       ${detail.evidence ? `${/^image\/(jpeg|png)$/.test(String(detail.evidence.mime)) ? `<figure class="evidence-photo"><a href="/invoices/${esc(invoice.id)}/evidence"><img src="/invoices/${esc(invoice.id)}/evidence" alt="The photographed proof of delivery for ${esc(invoice.invoice_number)}, as the readers received it" loading="lazy"></a><figcaption class="small muted">The photograph as filed${rawText.trim() ? '. The text below is what the readers transcribed from it' : ''}.</figcaption></figure>` : ''}
       ${rawText.trim() ? `<div class="doc">${highlightDocument(rawText.slice(0, 4000), highlightWords)}</div>` : ''}
-      ${highlightWords.length ? `<p class="small muted" style="margin:8px 0 0">Marked in the document: ${disagreementMarks.length ? 'what the two readers could not agree on' : 'the field a check failed on'}${disagreementMarks.length && failing.length ? ', and the field a check failed on' : ''}.</p>` : ''}
+      ${highlightWords.length ? `<p class="small muted" style="margin:8px 0 0">Marked in the document: ${disagreementMarks.length ? 'what the two readers could not agree on' : 'the field a check failed on'}${disagreementMarks.length && failedLines.length ? ', and the field a check failed on' : ''}.</p>` : ''}
       <p class="small muted" style="margin-top:10px">SHA-256 <span class="hash">${esc(detail.evidence?.sha256?.slice(0, 32) ?? '')}…</span></p>`
         : `<p class="small">${esc(reusedEvidenceNote)}</p>`}
       ${reading}
     </section>`;
 
-  const scoreCard = score ? `<div class="card" style="margin-bottom:18px"><dl class="kv">
+  const scoreCard = score ? `<div class="card" style="margin-bottom:18px"><h4 class="card-k">How the debtor scores</h4><dl class="kv">
           <dt>Debtor score</dt><dd class="em">${score.score} <span class="muted">band ${esc(score.band)}</span></dd>
-          ${Object.entries(components ?? {}).map(([k, v]: any) => `<dt class="muted">${esc(k)}</dt><dd class="muted">${v.points}/${v.max}</dd>`).join('')}
+          ${Object.entries(components ?? {}).map(([k, v]: any) => `<dt class="muted" title="${esc(v.detail ?? '')}">${esc(scoreLabel(k))}</dt><dd class="muted">${v.points}/${v.max}</dd>`).join('')}
         </dl></div>` : '<div class="card" style="margin-bottom:18px"><p class="muted" style="margin:0">No score.</p></div>';
 
-  const priceCard = price ? `<div class="card strong">
-        <dl class="kv">
-          <dt>Annual rate</dt><dd>${(Number(price.annual_rate_bp) / 100).toFixed(1)}%</dd>
-          <dt>Tenor</dt><dd>${price.tenor_days} days</dd>
-          <dt>Gross slice</dt><dd>${formatCents(Number(price.advance_cents) + Number(price.discount_cents) + Number(price.fee_reserve_cents))}</dd>
-          <dt>Fee reserve</dt><dd>${formatCents(Number(price.fee_reserve_cents))}</dd>
-          <dt>Net slice</dt><dd>${formatCents(Number(price.advance_cents) + Number(price.discount_cents))}</dd>
-          <dt>Discount</dt><dd>${formatCents(Number(price.discount_cents))}</dd>
-          <dt>Advance</dt><dd class="em">${formatCents(Number(price.advance_cents))}</dd>
-          <dt>Platform fee</dt><dd>${formatCents(Number(price.platform_fee_cents))}</dd>
+  const priceCard = price ? (() => {
+    const gross = Number(price.advance_cents) + Number(price.discount_cents) + Number(price.fee_reserve_cents);
+    const advance = Number(price.advance_cents);
+    const fee = Number(price.platform_fee_cents);
+    return `<div class="card strong">
+        <h4 class="card-k">How the advance is priced</h4>
+        <dl class="kv waterfall">
+          <dt>Gross slice <span class="why">the funder's unit of the debtor's payment at maturity</span></dt><dd>${formatCents(gross)}</dd>
+          <dt>Fee reserve <span class="why">PayPal's fee on that unit, estimated</span></dt><dd>−${formatCents(Number(price.fee_reserve_cents))}</dd>
+          <dt>Discount <span class="why">${(Number(price.annual_rate_bp) / 100).toFixed(1)}% a year for ${price.tenor_days} days, the funder's yield</span></dt><dd>−${formatCents(Number(price.discount_cents))}</dd>
+          <dt class="total">Advance <span class="why">what the funder pays now</span></dt><dd class="em total">${formatCents(advance)}</dd>
+          <dt>Platform fee <span class="why">out of the advance</span></dt><dd>−${formatCents(fee)}</dd>
+          <dt class="total">Seller receives now</dt><dd class="em total">${formatCents(advance - fee)}</dd>
         </dl>
-      </div>` : '';
+      </div>`;
+  })() : '';
 
   const slicesBlock = slices.length ? `<hr class="rule"><h3>Slices</h3><table><thead><tr><th>Funder</th><th class="r">Share</th><th class="r">Principal</th><th>Order</th><th>Capture</th></tr></thead><tbody>
       ${slices.map((s: any) => `<tr><td>${esc(s.funder_name ?? 'unassigned')}</td><td class="r num">${(Number(s.share_bp) / 100).toFixed(0)}%</td>
@@ -930,18 +962,15 @@ export function renderStatus(data: any): string {
   const body = join([
     `<h1>Desk status</h1>`,
     `<p class="lede">No login, no secrets: the audit chain is re-walked every time this page opens, the counts are read from the data, and the ledger re-asserts its own balance. Aggregate only — this page names no operator, no party and no document. Times are UTC.</p>`,
-    `<h2>The audit chain</h2>
-     <table><tbody>
-       <tr><th>Integrity</th><td class="${chain.ok ? 's-verified' : 's-refused'}">${chain.ok ? 'Intact — every hash in the chain recomputes' : `Broken at entry ${chain.brokenAt}: ${esc(chain.reason ?? '')}`}</td></tr>
-       <tr><th>Entries</th><td class="num">${Number(chain.length ?? 0).toLocaleString('en-US')}</td></tr>
-     </tbody></table>`,
-    `<h2>The book</h2>
-     <table><thead><tr><th>Total invoices</th><th>Refused</th><th>Verified</th><th>Funded</th></tr></thead><tbody>
-       <tr><td class="num">${Number(counts.total ?? 0).toLocaleString('en-US')}</td>
-           <td class="num">${Number(counts.refused ?? 0).toLocaleString('en-US')}</td>
-           <td class="num">${Number(counts.verified ?? 0).toLocaleString('en-US')}</td>
-           <td class="num">${Number(counts.funded ?? 0).toLocaleString('en-US')}</td></tr>
-     </tbody></table>`,
+    `<div class="status-tiles">
+       <div class="card stat ${chain.ok ? 'ok' : 'bad'}"><h3>Audit chain</h3>
+         <div class="big ${chain.ok ? 's-verified' : 's-refused'}">${chain.ok ? '✓ Intact' : '✕ Broken'}</div>
+         <p class="small muted">${chain.ok ? `All ${Number(chain.length ?? 0).toLocaleString('en-US')} hashed entries recompute, re-walked on this request.` : `Broken at entry ${esc(String(chain.brokenAt ?? ''))}: ${esc(chain.reason ?? '')}`}</p></div>
+       <div class="card stat"><h3>Invoices</h3><div class="big num">${Number(counts.total ?? 0).toLocaleString('en-US')}</div><p class="small muted">In the book</p></div>
+       <div class="card stat"><h3>Refused</h3><div class="big num s-refused">${Number(counts.refused ?? 0).toLocaleString('en-US')}</div><p class="small muted"><a href="/archive">By reason</a></p></div>
+       <div class="card stat"><h3>Verified</h3><div class="big num s-verified">${Number(counts.verified ?? 0).toLocaleString('en-US')}</div><p class="small muted">Open to funders</p></div>
+       <div class="card stat"><h3>Funded</h3><div class="big num" style="color:var(--gold)">${Number(counts.funded ?? 0).toLocaleString('en-US')}</div><p class="small muted">Paid through PayPal</p></div>
+     </div>`,
     `<h2>The settlement book, by account kind</h2>
      ${(data.ledgerByKind ?? []).length === 0
        ? `<p class="note">No postings yet. Nothing in the seeded book has been funded, so the ledger is empty — which is the honest state, not a hidden one. Fund a slice and this table fills from the same posting code the tests exercise.</p>`

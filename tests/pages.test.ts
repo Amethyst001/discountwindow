@@ -4,7 +4,8 @@ import crypto from 'node:crypto';
 import { openDb } from '../src/db.ts';
 import { intakeInvoice, invoiceDetail, type CreateInvoiceInput } from '../src/store.ts';
 import { issueAssignmentNotice } from '../src/notice.ts';
-import { renderDealRoom, readerDisagreementMarks } from '../src/pages.ts';
+import { renderDealRoom, renderBook, renderStatus, readerDisagreementMarks } from '../src/pages.ts';
+import { formatCents } from '../src/money.ts';
 import { extractDeterministic, reconcile, reconcilePixels, type Extraction } from '../src/extract.ts';
 
 const sha = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
@@ -154,7 +155,7 @@ test('the deal room shows both readings side by side and shades the field they s
   assert.match(html, /<th>Model read<\/th><th>Parser read<\/th><th>Used<\/th>/);
   const diffRows = html.match(/<tr class="diff">/g) ?? [];
   assert.equal(diffRows.length, 1, 'only the field the readers split on is shaded');
-  assert.match(html, /<tr class="diff">[\s\S]*?consigneeName[\s\S]*?Halcyon Retail<\/td>[\s\S]*?Halcyon Retail Group<\/td>[\s\S]*?45%[\s\S]*?<\/tr>/);
+  assert.match(html, /<tr class="diff">[\s\S]*?Consignee[\s\S]*?Halcyon Retail<\/td>[\s\S]*?Halcyon Retail Group<\/td>[\s\S]*?45%[\s\S]*?<\/tr>/);
   // Halved confidence is what the disagreement costs, and it is below the floor: the same row that
   // is shaded on the page is the reason the invoice is not priced.
   assert.match(html, /POD_UNREADABLE/);
@@ -206,7 +207,7 @@ test('a photographed document is opened by two models, and the page shows both a
   assert.equal(diffRows.length, 1, 'only the field the readers split on is shaded');
   // Two comparisons disagreed, so the field is halved twice and the second one is what a single model
   // could not have produced: the parser cannot bring it back over the floor.
-  assert.match(html, /<tr class="diff">[\s\S]*?consigneeName[\s\S]*?Halcyon Retail<\/td>[\s\S]*?Halcyon Retail Group<\/td>[\s\S]*?23%[\s\S]*?<\/tr>/);
+  assert.match(html, /<tr class="diff">[\s\S]*?Consignee[\s\S]*?Halcyon Retail<\/td>[\s\S]*?Halcyon Retail Group<\/td>[\s\S]*?23%[\s\S]*?<\/tr>/);
   assert.match(html, /POD_UNREADABLE/);
   assert.match(html, /cannot arbitrate a disagreement about the photograph/);
 });
@@ -243,4 +244,54 @@ test('a non-desk name wearing the desk lens still does not get the desk notebook
   assert.doesNotMatch(sellerInDeskLens, /Service register/, 'the register is whose log it is, not what lens is worn');
   assert.doesNotMatch(sellerInDeskLens, /register\.csv/);
   assert.doesNotMatch(sellerInDeskLens, /action="\/invoices\/[a-z0-9_]+\/notice\/service"/);
+});
+
+test('only the line a failing check read is marked: a consignee refusal does not mark the tracking number', () => {
+  const db = openDb(':memory:');
+  const text = 'FEDEX PROOF OF DELIVERY\nTracking number: 770123456790\nStatus: DELIVERED\nConsignee: Halcyon Logistics';
+  const made = intake(db, 'A-1043', text, { carrier: 'FedEx', trackingNumber: '770123456790', consigneeName: 'Halcyon Logistics' });
+  const html = desk(db, made.invoiceId);
+  assert.match(html, /Refused: consignee mismatch/);
+  assert.match(html, /Consignee: <mark>Halcyon Logistics<\/mark>/);
+  assert.doesNotMatch(html, /<mark>[^<]*770123456790/);
+});
+
+test('the price reads as a waterfall that adds up: gross less reserve less discount is the advance, less the fee is the seller', () => {
+  const db = openDb(':memory:');
+  const made = intake(db, 'A-1042', doc('1Z999AA10123456784'));
+  const detail = invoiceDetail(db, made.invoiceId);
+  const p = detail.price;
+  const gross = Number(p.advance_cents) + Number(p.discount_cents) + Number(p.fee_reserve_cents);
+  const html = desk(db, made.invoiceId);
+  assert.match(html, /How the advance is priced/);
+  for (const v of [formatCents(gross), `−${formatCents(Number(p.fee_reserve_cents))}`, `−${formatCents(Number(p.discount_cents))}`,
+    formatCents(Number(p.advance_cents)), formatCents(Number(p.advance_cents) - Number(p.platform_fee_cents))]) {
+    assert.ok(html.includes(v), v);
+  }
+  assert.match(html, /Seller receives now/);
+});
+
+test('a guest sees the fund step as the page\'s main action, switched off, and no form that would post it', () => {
+  const db = openDb(':memory:');
+  const made = intake(db, 'A-1042', doc('1Z999AA10123456784'));
+  const html = renderDealRoom(invoiceDetail(db, made.invoiceId), true, 'funder', { role: 'guest', name: 'guest' });
+  assert.match(html, /<button type="button" class="primary" disabled aria-disabled="true">Fund the seller&#39;s advance<\/button>/);
+  assert.doesNotMatch(html, /action="\/invoices\/[^"]+\/fund"/);
+  const desked = desk(db, made.invoiceId);
+  assert.match(desked, /action="\/invoices\/[^"]+\/fund"/);
+});
+
+test('the book\'s counts are links to the same filters as the tabs', () => {
+  const html = renderBook([], { total: 3, refused: 1, verified: 1, funded: 1 }, true);
+  assert.match(html, /href="\/\?filter=refused#book"/);
+  assert.match(html, /href="\/\?filter=funded#book"/);
+});
+
+test('the status page leads with the chain\'s integrity and says when it is broken', () => {
+  const ok = renderStatus({ auditChain: { ok: true, length: 12 }, archiveCounts: { total: 3, refused: 1, verified: 1, funded: 1 } });
+  assert.match(ok, /✓ Intact/);
+  assert.match(ok, /All 12 hashed entries recompute/);
+  const bad = renderStatus({ auditChain: { ok: false, brokenAt: 7, reason: 'hash mismatch' }, archiveCounts: {} });
+  assert.match(bad, /✕ Broken/);
+  assert.match(bad, /Broken at entry 7: hash mismatch/);
 });

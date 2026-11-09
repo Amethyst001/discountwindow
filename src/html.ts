@@ -218,6 +218,27 @@ details.override > summary { cursor: pointer; }
   th:nth-child(5), td:nth-child(5), th:nth-child(7), td:nth-child(7) { display: none; }
   .doc { padding: 14px; }
 }
+/* Round 5: plain labels, priced waterfall, visible held actions, status tiles */
+.held { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 18px; }
+.held .note { margin: 0; max-width: 46ch; }
+.verdict-actions .held { margin-top: 0; }
+button.primary:disabled { background: #e6dfcf; color: #5a5348; border: 1px dashed #8f8676; box-shadow: none; }
+.card-k { font-family: var(--sans); font-size: 0.8125rem; font-weight: 600; color: var(--ink-2); margin: 0 0 10px; }
+.kv dt .why { display: block; font-size: 0.75rem; color: var(--ink-3); line-height: 1.35; }
+.waterfall dt { color: var(--ink); }
+.waterfall dt.total, .waterfall dd.total { border-top: 1px solid var(--rule); padding-top: 6px; }
+.waterfall dd { align-self: start; }
+a.card.stat { display: block; border-bottom: 1px solid var(--rule); transition: border-color .12s, transform .12s; }
+a.card.stat:hover { border-color: var(--ink); transform: translate(-1px,-1px); }
+.status-tiles { display: grid; grid-template-columns: 1.5fr repeat(4, minmax(0,1fr)); gap: 16px; margin: 8px 0 36px; }
+.status-tiles .stat h3 { margin-bottom: 6px; }
+.status-tiles .big { font-size: 1.75rem; font-family: var(--mono); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.status-tiles .stat p { margin: 6px 0 0; }
+.status-tiles .stat.ok { border-left: 4px solid var(--olive); }
+.status-tiles .stat.bad { border-left: 4px solid var(--oxblood); }
+main h2 { margin-top: 28px; }
+@media (max-width: 980px) { .status-tiles { grid-template-columns: repeat(2, minmax(0,1fr)); } .status-tiles .stat.ok, .status-tiles .stat.bad { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: reduce) { a.card.stat { transition: none; } a.card.stat:hover { transform: none; } }
 `;
 
 export interface LayoutOptions {

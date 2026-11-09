@@ -38,7 +38,7 @@ synthetic. 167 tests. No pilots or users yet.
 ## Judge in 3 clicks
 
 **Live demo:** {RENDER_URL}. Reading needs no password: the instance runs with `DEMO_PUBLIC_READ=1`, so a
-visitor is a read-only guest and no button is offered. The free instance sleeps when idle, so the first
+visitor is a read-only guest and the action buttons are shown switched off. The free instance sleeps when idle, so the first
 load can take about a minute.
 
 1. **{RENDER_URL}/n/A-1043:** a $48,000 invoice refused with `CONSIGNEE_MISMATCH`. The delivery was signed
