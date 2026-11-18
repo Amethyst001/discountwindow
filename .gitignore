@@ -23,3 +23,5 @@ temp/
 
 # Local submission kit (video, thumbnails, gallery): large media, kept out of git
 submission/
+
+PLAN.md
